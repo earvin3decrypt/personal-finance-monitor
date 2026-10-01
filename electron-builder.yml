@@ -1,0 +1,32 @@
+appId: com.personal.finance-monitor
+productName: Personal Finance Monitor
+directories:
+  output: dist-electron
+
+files:
+  - electron/**/*
+  - "!node_modules"
+  - "!src"
+  - "!.next"
+  - "!data"
+  - "!drizzle"
+  - "!dist-standalone"
+
+mac:
+  category: public.app-category.finance
+  target:
+    - target: dir
+      arch:
+        - arm64
+  darkModeSupport: true
+  hardenedRuntime: true
+
+dmg:
+  title: Personal Finance Monitor
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications

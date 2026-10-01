@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: oklch(0.976 0.003 255);
+  --foreground: oklch(0.21 0.02 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.02 260);
+  --muted: oklch(0.955 0.006 255);
+  --muted-foreground: oklch(0.5 0.018 260);
+  --border: oklch(0.917 0.007 255);
+  --primary: oklch(0.54 0.19 255);
+  --primary-foreground: oklch(0.99 0 0);
+  --primary-light: oklch(0.94 0.04 250);
+  --gain: oklch(0.55 0.15 145);
+  --loss: oklch(0.55 0.18 25);
+  --accent: oklch(0.92 0.03 250);
+  color-scheme: light;
+}
+
+.dark {
+  --background: oklch(0.158 0.014 260);
+  --foreground: oklch(0.93 0.008 260);
+  --card: oklch(0.2 0.015 260);
+  --card-foreground: oklch(0.93 0.008 260);
+  --muted: oklch(0.25 0.016 260);
+  --muted-foreground: oklch(0.68 0.018 260);
+  --border: oklch(0.3 0.018 260);
+  --primary: oklch(0.72 0.14 250);
+  --primary-foreground: oklch(0.15 0.02 260);
+  --primary-light: oklch(0.3 0.06 250);
+  --gain: oklch(0.74 0.16 145);
+  --loss: oklch(0.72 0.16 25);
+  --accent: oklch(0.3 0.03 250);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-light: var(--primary-light);
+  --color-gain: var(--gain);
+  --color-loss: var(--loss);
+  --color-accent: var(--accent);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
+  letter-spacing: -0.011em;
+  text-rendering: optimizeLegibility;
+}
+
+/* Quiet, thin scrollbars everywhere (Chromium honors these in Electron). */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklch, var(--foreground) 18%, transparent)
+    transparent;
+}
+
+::selection {
+  background: color-mix(in oklch, var(--primary) 24%, transparent);
+}
+
+/* Modal entrance */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.modal-backdrop-in {
+  animation: fade-in 0.15s ease-out;
+}
+
+.modal-panel-in {
+  animation: modal-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-backdrop-in,
+  .modal-panel-in {
+    animation: none;
+  }
+}
+
+/* Privacy: blur monetary amounts when enabled */
+html[data-blur-amounts="true"] .blur-amount {
+  filter: blur(0.45rem);
+  user-select: none;
+  transition: filter 0.15s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-blur-amounts="true"] .blur-amount {
+    transition: none;
+  }
+}
