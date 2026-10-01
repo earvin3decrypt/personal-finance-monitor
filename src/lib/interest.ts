@@ -35,21 +35,6 @@ function lastDayOfMonth(date: Date): string {
   return dateISO(end);
 }
 
-function monthLabel(date: Date): string {
-  return new Intl.DateTimeFormat("en-GB", {
-    month: "long",
-    year: "numeric",
-  }).format(date);
-}
-
-function dayLabel(date: Date): string {
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(date);
-}
-
 function creditMonthlyInterest(
   account: {
     id: number;
@@ -84,7 +69,7 @@ function creditMonthlyInterest(
           type: "income",
           amount: interest,
           currency: account.currency,
-          description: `Interest — ${monthLabel(cursor)}`,
+          description: "Monthly interest",
           date: lastDayOfMonth(cursor),
           createdAt: now,
         })
@@ -138,7 +123,7 @@ function creditDailyInterest(
           type: "income",
           amount: interest,
           currency: account.currency,
-          description: `Interest — ${dayLabel(cursor)}`,
+          description: "Interest payout",
           date: creditedDate,
           createdAt: now,
         })

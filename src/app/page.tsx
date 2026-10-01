@@ -13,9 +13,14 @@ import {
   computeSnapshotTrend,
   filterMultiSeriesForRange,
 } from "@/lib/chart-data";
-import { getExpenseStats } from "@/lib/expense-stats";
 import { getSavingsGoalsWithHistory } from "@/lib/savings";
-import { formatDate, formatMoney, todayISO } from "@/lib/format";
+import { getBudgetsWithSpending } from "@/lib/budgets";
+import {
+  displayTransactionTitle,
+  formatMoney,
+  formatRelativeDate,
+  todayISO,
+} from "@/lib/format";
 import {
   Card,
   OfflineBanner,
@@ -25,6 +30,7 @@ import {
 import { NetWorthChart, BreakdownDonut } from "@/components/charts";
 import { CategoryIcon } from "@/components/category-icon";
 import { DashboardGoals } from "@/components/dashboard-goals";
+import { DashboardMonthlyBudget } from "@/components/dashboard-monthly-budget";
 import { DashboardRefreshButton } from "@/components/dashboard-refresh-button";
 import { UpcomingBillsCard } from "@/components/upcoming-bills-card";
 import { Money } from "@/components/money";
@@ -35,12 +41,6 @@ export const metadata: Metadata = {
   description: "Net worth, portfolio trend, and recent activity",
 };
 
-function previousMonth(month: string): string {
-  const d = new Date(`${month}-01`);
-  d.setMonth(d.getMonth() - 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
 export default async function DashboardPage() {
   noStore();
   await applyDueInterest();
@@ -50,13 +50,11 @@ export default async function DashboardPage() {
   const today = todayISO();
   const currentMonth = today.slice(0, 7);
 
-  const [monthStats, prevMonthStats, savingsGoals, billAlerts] =
-    await Promise.all([
-      getExpenseStats(currentMonth),
-      getExpenseStats(previousMonth(currentMonth)),
-      getSavingsGoalsWithHistory(),
-      getBillAlerts(),
-    ]);
+  const [savingsGoals, billAlerts, budgets] = await Promise.all([
+    getSavingsGoalsWithHistory(),
+    getBillAlerts(),
+    getBudgetsWithSpending(currentMonth),
+  ]);
 
   const recentExpenses = db
     .select({
@@ -80,7 +78,7 @@ export default async function DashboardPage() {
 
   const chartData = buildNetWorthChartData(history, summary, today);
   const chartData1M = filterMultiSeriesForRange(chartData, "1M");
-  
+
   const sparklines = {
     netWorth: chartData1M.map((d) => d.total),
     investments: chartData1M.map((d) => d.investments),
@@ -118,7 +116,13 @@ export default async function DashboardPage() {
   );
 
   const topGoals = savingsGoals
-    .sort((a, b) => b.percent - a.percent)
+    .slice()
+    .sort((a, b) => {
+      const aDone = a.percent >= 100 ? 1 : 0;
+      const bDone = b.percent >= 100 ? 1 : 0;
+      if (aDone !== bDone) return aDone - bDone;
+      return b.percent - a.percent;
+    })
     .slice(0, 3)
     .map((g) => ({
       id: g.id,
@@ -129,6 +133,23 @@ export default async function DashboardPage() {
       percent: g.percent,
       currency: g.currency,
     }));
+
+  const budgetItems = budgets
+    .slice()
+    .sort((a, b) => b.percent - a.percent)
+    .map((b) => ({
+      id: b.id,
+      name: b.parentName ? `${b.parentName} · ${b.name}` : b.name,
+      icon: b.icon,
+      color: b.color,
+      spent: b.spent,
+      limit: b.limit,
+      percent: b.percent,
+      currency: summary.baseCurrency,
+    }));
+  const totalBudgetLimit = budgets.reduce((sum, b) => sum + b.limit, 0);
+  const totalBudgetSpent = budgets.reduce((sum, b) => sum + b.spent, 0);
+  const showBudgetCompanion = topGoals.length <= 1;
 
   return (
     <>
@@ -205,8 +226,8 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
+      <div className="grid items-stretch gap-6 lg:grid-cols-2">
+        <Card className="flex h-full flex-col">
           <div className="mb-4 flex items-center justify-between gap-2">
             <h2 className="text-sm font-medium text-muted-foreground">
               Recent transactions
@@ -226,26 +247,25 @@ export default async function DashboardPage() {
               {recentExpenses.map((e) => (
                 <li
                   key={e.id}
-                  className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
+                  className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 py-3 first:pt-0 last:pb-0"
                 >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <CategoryIcon
-                      icon={e.categoryIcon}
-                      color={e.categoryColor}
-                      size={16}
-                    />
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">
-                        {e.description || e.categoryName}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {e.categoryName}
-                      </p>
-                    </div>
+                  <CategoryIcon
+                    icon={e.categoryIcon}
+                    color={e.categoryColor}
+                    size={16}
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium leading-5">
+                      {displayTransactionTitle(e.description, e.categoryName)}
+                    </p>
+                    <p className="truncate text-xs leading-4 text-muted-foreground">
+                      {e.categoryName}
+                      {e.accountName ? ` · ${e.accountName}` : ""}
+                    </p>
                   </div>
                   <div className="shrink-0 text-right">
                     <p
-                      className={`tabular-nums font-medium ${
+                      className={`text-sm font-medium tabular-nums leading-5 ${
                         e.type === "income" ? "text-gain" : "text-foreground"
                       }`}
                     >
@@ -254,8 +274,8 @@ export default async function DashboardPage() {
                         {formatMoney(e.amount, e.currency)}
                       </Money>
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDate(e.date)}
+                    <p className="text-xs leading-4 text-muted-foreground">
+                      {formatRelativeDate(e.date, today)}
                     </p>
                   </div>
                 </li>
@@ -264,7 +284,21 @@ export default async function DashboardPage() {
           )}
         </Card>
 
-        <DashboardGoals goals={topGoals} />
+        <div
+          className={`flex flex-col gap-6 ${showBudgetCompanion ? "" : "h-full"}`}
+        >
+          <div className={showBudgetCompanion ? undefined : "min-h-0 flex-1"}>
+            <DashboardGoals goals={topGoals} />
+          </div>
+          {showBudgetCompanion && (
+            <DashboardMonthlyBudget
+              budgets={budgetItems}
+              currency={summary.baseCurrency}
+              totalSpent={totalBudgetSpent}
+              totalLimit={totalBudgetLimit}
+            />
+          )}
+        </div>
       </div>
     </>
   );

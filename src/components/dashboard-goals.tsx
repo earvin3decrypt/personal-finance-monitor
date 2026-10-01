@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
 import { CategoryIcon } from "@/components/category-icon";
 import { Card } from "@/components/ui";
 import { formatMoney } from "@/lib/format";
@@ -16,6 +16,8 @@ type Goal = {
 };
 
 export function DashboardGoals({ goals }: { goals: Goal[] }) {
+  const showCreateSlot = goals.length < 3;
+
   return (
     <Card className="flex h-full flex-col">
       <div className="mb-4 flex items-center justify-between gap-2">
@@ -32,18 +34,30 @@ export function DashboardGoals({ goals }: { goals: Goal[] }) {
       </div>
 
       {goals.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No savings goals yet.{" "}
-          <Link href="/savings" className="font-medium text-primary hover:underline">
-            Create one
-          </Link>
-        </p>
+        <ul className="flex flex-1 flex-col gap-3">
+          <li className="flex flex-1">
+            <Link
+              href="/savings"
+              className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted/40 hover:text-foreground"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-border">
+                <Plus className="h-4 w-4" />
+              </span>
+              <span className="font-medium">Create new goal</span>
+              <span className="text-xs">Set a savings target to get started</span>
+            </Link>
+          </li>
+        </ul>
       ) : (
-        <ul className="space-y-3">
+        <ul className="flex flex-1 flex-col gap-3">
           {goals.map((goal) => {
             const remaining = Math.max(0, goal.target - goal.current);
+            const complete = goal.percent >= 100;
             return (
-              <li key={goal.id} className="rounded-xl border border-border p-4 shadow-sm">
+              <li
+                key={goal.id}
+                className="rounded-xl border border-border p-4 shadow-sm"
+              >
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <span className="flex min-w-0 items-center gap-2">
                     <CategoryIcon icon={goal.icon} size={16} />
@@ -64,18 +78,38 @@ export function DashboardGoals({ goals }: { goals: Goal[] }) {
                 <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
                   <span className="tabular-nums">
                     <Money>
-                      {formatMoney(goal.current, goal.currency)} saved
+                      {formatMoney(goal.current, goal.currency)}
+                      {" / "}
+                      {formatMoney(goal.target, goal.currency)}
                     </Money>
                   </span>
                   <span className="tabular-nums">
-                    <Money>
-                      {formatMoney(remaining, goal.currency)} to go
-                    </Money>
+                    {complete ? (
+                      "Complete"
+                    ) : (
+                      <Money>
+                        {formatMoney(remaining, goal.currency)} left
+                      </Money>
+                    )}
                   </span>
                 </div>
               </li>
             );
           })}
+
+          {showCreateSlot && (
+            <li className="flex min-h-[5.5rem] flex-1">
+              <Link
+                href="/savings"
+                className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border px-4 py-5 text-center text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted/40 hover:text-foreground"
+              >
+                <span className="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-border">
+                  <Plus className="h-4 w-4" />
+                </span>
+                <span className="font-medium">Create new goal</span>
+              </Link>
+            </li>
+          )}
         </ul>
       )}
     </Card>

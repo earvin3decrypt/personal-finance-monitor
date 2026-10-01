@@ -6,7 +6,11 @@ import { searchExpensesAction, deleteExpense } from "@/app/actions/expenses";
 import { CategoryIcon } from "@/components/category-icon";
 import { ExpenseEditModal } from "@/components/expense-edit-modal";
 import { Button, Input } from "@/components/ui";
-import { formatDate, formatMoney } from "@/lib/format";
+import {
+  displayTransactionTitle,
+  formatRelativeDate,
+  formatMoney,
+} from "@/lib/format";
 import type { CategoryWithChildren } from "@/lib/categories";
 import type { ExpenseOperation } from "@/lib/expense-stats";
 import { Money } from "@/components/money";
@@ -162,26 +166,24 @@ function OperationRow({
   onEdit: () => void;
 }) {
   return (
-    <li className="flex flex-col justify-between gap-3 rounded-xl p-3 transition-colors hover:bg-muted/30 sm:flex-row sm:items-center">
-      <div className="flex min-w-0 items-center gap-3">
-        <CategoryIcon
-          icon={op.categoryIcon}
-          color={op.categoryColor}
-          size={16}
-        />
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium">
-            {op.description || op.categoryName}
-          </p>
-          <p className="truncate text-xs text-muted-foreground">
-            {formatDate(op.date)} · {op.accountName}
-          </p>
-        </div>
+    <li className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 rounded-xl p-3 transition-colors hover:bg-muted/30">
+      <CategoryIcon
+        icon={op.categoryIcon}
+        color={op.categoryColor}
+        size={16}
+      />
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium leading-5">
+          {displayTransactionTitle(op.description, op.categoryName)}
+        </p>
+        <p className="truncate text-xs leading-4 text-muted-foreground">
+          {formatRelativeDate(op.date)} · {op.accountName}
+        </p>
       </div>
 
-      <div className="ml-9 flex items-center justify-between gap-2 sm:ml-0 sm:justify-end">
+      <div className="flex shrink-0 items-center gap-2">
         <span
-          className={`text-sm font-medium tabular-nums ${
+          className={`text-sm font-medium tabular-nums leading-5 ${
             op.type === "income" ? "text-gain" : ""
           }`}
         >

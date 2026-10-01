@@ -58,12 +58,65 @@ export function signedChangeClass(value: number | null | undefined): string {
   return value > 0 ? "text-gain" : "text-loss";
 }
 
+/** Parse an ISO date (`YYYY-MM-DD`) as local midnight to avoid TZ shifts. */
+function parseLocalDate(date: string): Date {
+  return new Date(`${date.slice(0, 10)}T00:00:00`);
+}
+
+/** Consistent `DD MMM YYYY` (e.g. 30 Sep 2026). */
 export function formatDate(date: string): string {
   return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
+    day: "2-digit",
     month: "short",
     year: "numeric",
-  }).format(new Date(date));
+  }).format(parseLocalDate(date));
+}
+
+/** Relative label for recent rows: Today / Yesterday, else `DD MMM YYYY`. */
+export function formatRelativeDate(date: string, today = todayISO()): string {
+  const day = date.slice(0, 10);
+  if (day === today) return "Today";
+  const yesterday = new Date(`${today}T00:00:00`);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayISO = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
+  if (day === yesterdayISO) return "Yesterday";
+  return formatDate(day);
+}
+
+/**
+ * Clean transaction titles that duplicate the category or embed a date
+ * (e.g. "Interest — 30 September 2026" → "Monthly interest").
+ */
+export function displayTransactionTitle(
+  description: string | null | undefined,
+  categoryName: string,
+): string {
+  const raw = (description ?? "").trim();
+  if (!raw) return categoryName;
+
+  const interestMatch = /^interest\s*[—–-]\s*/i.exec(raw);
+  if (interestMatch || /^interest$/i.test(raw)) {
+    // Daily interest descriptions include a full day label; monthly use month+year.
+    const rest = raw.slice(interestMatch?.[0].length ?? raw.length).trim();
+    const looksLikeDay =
+      /^\d{1,2}\s+\w+/i.test(rest) && !/^\w+\s+\d{4}$/i.test(rest);
+    return looksLikeDay ? "Interest payout" : "Monthly interest";
+  }
+
+  // "Category — anything" or exact category name → use a cleaner label
+  const embDash = new RegExp(
+    `^${escapeRegExp(categoryName)}\\s*[—–-]\\s*.+$`,
+    "i",
+  );
+  if (embDash.test(raw) || raw.toLowerCase() === categoryName.toLowerCase()) {
+    return categoryName;
+  }
+
+  return raw;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 export function todayISO(): string {
