@@ -1,291 +1,175 @@
 "use client";
 
-import { useState } from "react";
-import { Info } from "lucide-react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  ResponsiveContainer,
-  Tooltip,
-} from "recharts";
-import { CategoryIcon } from "@/components/category-icon";
+import { CategoryIcon, resolveCategoryIcon } from "@/components/category-icon";
+import { useExpenseFilters } from "@/components/expense-filter-context";
+import { Card } from "@/components/ui";
+import { Money } from "@/components/money";
 import { formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { CategoryBreakdown, DailySpend } from "@/lib/expense-stats";
-import { Money } from "@/components/money";
+import type { CategoryBreakdown } from "@/lib/expense-stats";
 
-type MonthlyStatsProps = {
-  baseCurrency: string;
-  totalExpenseMonth: number;
-  totalIncomeMonth: number;
-  dailyAverage: number;
-  trendPercent: number;
-  daily: DailySpend[];
-  monthLabel?: string;
-};
+/** Same template on every row so the bar tracks line up. */
+const ROW_GRID =
+  "grid grid-cols-[2.25rem_minmax(0,7rem)_minmax(0,1fr)_5.75rem] items-center gap-x-3 sm:grid-cols-[2.25rem_minmax(0,8.5rem)_minmax(0,1fr)_6rem]";
 
-export function ExpenseMonthlyStats({
-  baseCurrency,
-  totalExpenseMonth,
-  totalIncomeMonth,
-  dailyAverage,
-  trendPercent,
-  daily,
-  monthLabel,
-}: MonthlyStatsProps) {
+function FixedBadge() {
   return (
-    <section className="mb-10">
-      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-        {monthLabel && (
-          <h2 className="mb-4 text-sm font-semibold text-foreground/90">
-            Statistics · {monthLabel}
-          </h2>
-        )}
-        <div className="mb-6 flex flex-wrap gap-6 border-b border-border/50 pb-5">
-          <div>
-            <p className="mb-1 text-sm text-muted-foreground">Expenses</p>
-            <p className="text-2xl font-bold tabular-nums">
-              <Money amount={totalExpenseMonth} currency={baseCurrency} />
-            </p>
-          </div>
-          <div>
-            <p className="mb-1 text-sm text-muted-foreground">Income</p>
-            <p className="text-2xl font-bold tabular-nums text-gain">
-              <Money>+{formatMoney(totalIncomeMonth, baseCurrency)}</Money>
-            </p>
-          </div>
-          <div>
-            <p className="mb-1 text-sm text-muted-foreground">
-              Daily avg (expenses)
-            </p>
-            <p className="text-2xl font-bold tabular-nums">
-              <Money amount={dailyAverage} currency={baseCurrency} />
-            </p>
-          </div>
-        </div>
-
-        <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-          <span>Daily activity</span>
-          <div className="flex gap-3">
-            <span className="flex items-center gap-1.5">
-              <div className="h-2 w-2 rounded-full bg-primary" /> Expenses
-            </span>
-            <span className="flex items-center gap-1.5">
-              <div className="h-2 w-2 rounded-full bg-gain" /> Income
-            </span>
-          </div>
-        </div>
-
-        <ResponsiveContainer width="100%" height={180}>
-          <BarChart
-            data={daily}
-            barCategoryGap={2}
-            margin={{ top: 10, right: 0, left: 0, bottom: 0 }}
-          >
-            <XAxis
-              dataKey="day"
-              tick={{ fontSize: 10, fill: "oklch(0.52 0.02 260)" }}
-              interval={4}
-              axisLine={false}
-              tickLine={false}
-            />
-            <Tooltip
-              contentStyle={{
-                borderRadius: "0.75rem",
-                border: "1px solid oklch(0.91 0.01 250)",
-                boxShadow: "0 4px 12px oklch(0.22 0.02 260 / 0.08)",
-              }}
-              formatter={(v: number, name: string) => [
-                <Money key="v" amount={v} currency={baseCurrency} />,
-                name === "expense" ? "Expense" : "Income",
-              ]}
-              labelFormatter={(d) => `Day ${d}`}
-              cursor={{ fill: "oklch(0.95 0.01 250 / 0.5)" }}
-            />
-            <Bar
-              dataKey="expense"
-              fill="oklch(0.55 0.19 250)"
-              radius={[2, 2, 0, 0]}
-            />
-            <Bar
-              dataKey="income"
-              fill="var(--color-gain)"
-              radius={[2, 2, 0, 0]}
-            />
-          </BarChart>
-        </ResponsiveContainer>
-
-        {trendPercent !== 0 && (
-          <div className="mt-5 flex items-start gap-2 rounded-xl bg-primary-light/40 px-3 py-2 text-sm text-primary">
-            <Info className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>
-              Your average consumption has{" "}
-              {trendPercent > 0 ? "increased" : "decreased"} by{" "}
-              <strong>{Math.abs(trendPercent).toFixed(0)}%</strong> compared to
-              the previous month.
-            </span>
-          </div>
-        )}
-      </div>
-    </section>
+    <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+      Fixed
+    </span>
   );
 }
 
 export function ExpenseCategoryBreakdown({
   baseCurrency,
   breakdown,
+  totalExpense,
 }: {
   baseCurrency: string;
   breakdown: CategoryBreakdown[];
+  totalExpense: number;
 }) {
-  const [expandedId, setExpandedId] = useState<number | null>(
-    breakdown[0]?.categoryId ?? null,
-  );
+  const { categoryId: activeId, setCategoryId } = useExpenseFilters();
+  const active = breakdown.find((c) => c.categoryId === activeId) ?? null;
 
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-      <div className="border-b border-border/50 p-5">
-        <h3 className="font-semibold text-foreground/90">Categories</h3>
-      </div>
-      <div className="flex-1 p-5">
-        {breakdown.length === 0 ? (
-          <p className="py-4 text-center text-sm text-muted-foreground">
-            No expenses for this month.
+    <Card className="flex h-full min-w-0 flex-col">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold">Where it went</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Select a category to filter activity
           </p>
-        ) : (
-          <ul className="space-y-6">
-            {breakdown.map((cat) => {
-              const hasBudget = cat.budgetLimit != null && cat.budgetLimit > 0;
-              const barPercent = hasBudget
-                ? Math.min(100, cat.budgetPercent ?? 0)
-                : cat.percent;
-              const overspent =
-                hasBudget && (cat.budgetPercent ?? 0) > 100;
+        </div>
+        {active && (
+          <button
+            type="button"
+            onClick={() => setCategoryId(null)}
+            className="rounded-md text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/10"
+          >
+            Clear filter
+          </button>
+        )}
+      </div>
 
+      {breakdown.length === 0 ? (
+        <p className="py-4 text-center text-sm text-muted-foreground">
+          No expenses for this month.
+        </p>
+      ) : (
+        <>
+          <ul className="-mx-2 space-y-1">
+            {breakdown.map((cat) => {
+              const selected = cat.categoryId === activeId;
+              const hasBudget = cat.budgetLimit != null && cat.budgetLimit > 0;
+              const overspent = hasBudget && (cat.budgetPercent ?? 0) > 100;
               return (
                 <li key={cat.categoryId}>
                   <button
                     type="button"
-                    onClick={() =>
-                      setExpandedId(
-                        expandedId === cat.categoryId ? null : cat.categoryId,
-                      )
-                    }
-                    className="group w-full text-left"
+                    aria-pressed={selected}
+                    onClick={() => setCategoryId(selected ? null : cat.categoryId)}
+                    className={cn(
+                      ROW_GRID,
+                      "w-full rounded-xl px-2 py-2 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/10",
+                      selected && "bg-primary-light/40 hover:bg-primary-light/40",
+                    )}
                   >
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="flex min-w-0 items-center gap-3">
-                        <CategoryIcon
-                          icon={cat.icon}
-                          color={cat.color}
-                          size={18}
-                        />
-                        <span className="truncate font-medium transition-colors group-hover:text-primary">
+                    <CategoryIcon
+                      icon={resolveCategoryIcon(cat.icon, cat.name)}
+                      color={cat.color}
+                      size={16}
+                    />
+                    <span className="min-w-0">
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span className="truncate text-sm font-medium">
                           {cat.name}
                         </span>
+                        {cat.isFixed && <FixedBadge />}
                       </span>
-                      <span className="shrink-0 text-sm font-medium tabular-nums">
-                        <Money amount={cat.total} currency={baseCurrency} />
-                        {hasBudget && (
-                          <span className="font-normal text-muted-foreground">
-                            <Money>
-                              {" "}
-                              / {formatMoney(cat.budgetLimit!, baseCurrency)}
-                            </Money>
-                          </span>
+                      <span
+                        className={cn(
+                          "block truncate text-xs tabular-nums",
+                          overspent ? "font-medium text-loss" : "text-muted-foreground",
                         )}
+                      >
+                        {cat.percent > 0 && cat.percent < 1
+                          ? "<1"
+                          : cat.percent.toFixed(0)}
+                        %
+                        {hasBudget &&
+                          ` · ${(cat.budgetPercent ?? 0).toFixed(0)}% of budget`}
                       </span>
-                    </div>
-                    <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full transition-all"
+                    </span>
+                    <span
+                      className="h-2 overflow-hidden rounded-full bg-muted"
+                      aria-hidden
+                    >
+                      <span
+                        className="block h-full rounded-full"
                         style={{
-                          width: `${Math.max(barPercent, 0)}%`,
+                          width: `${Math.min(100, Math.max(0, cat.percent))}%`,
                           backgroundColor: cat.color,
                         }}
                       />
-                    </div>
-                    <p
-                      className={`mt-1.5 text-right text-xs ${
-                        overspent ? "font-medium text-loss" : "text-muted-foreground"
-                      }`}
-                    >
-                      {hasBudget
-                        ? `${(cat.budgetPercent ?? 0).toFixed(2)}% of budget used`
-                        : `${cat.percent.toFixed(0)}% of spending`}
-                    </p>
+                    </span>
+                    <span className="text-right text-sm font-medium tabular-nums">
+                      <Money amount={cat.total} currency={baseCurrency} />
+                    </span>
                   </button>
-                  {expandedId === cat.categoryId &&
-                    cat.subcategories.length > 0 && (
-                      <ul className="ml-[9px] mt-3 space-y-2.5 border-l-2 border-border/60 pl-5">
-                        {cat.subcategories.map((sub) => {
-                          const subHasBudget =
-                            sub.budgetLimit != null && sub.budgetLimit > 0;
-                          const subOverspent =
-                            subHasBudget && (sub.budgetPercent ?? 0) > 100;
 
-                          return (
-                          <li
-                            key={sub.id}
-                            className="space-y-1.5 text-sm text-muted-foreground"
-                          >
-                            <div className="flex justify-between gap-3">
-                              <span>{sub.name}</span>
-                              <span
-                                className={cn(
-                                  "shrink-0 font-medium tabular-nums",
-                                  subOverspent
-                                    ? "text-loss"
-                                    : "text-foreground/80",
-                                )}
-                              >
-                                <Money amount={sub.total} currency={baseCurrency} />
-                                {subHasBudget && (
-                                  <span className="font-normal text-muted-foreground">
-                                    <Money>
-                                      {" "}
-                                      / {formatMoney(sub.budgetLimit!, baseCurrency)}
-                                    </Money>
-                                  </span>
-                                )}
-                              </span>
-                            </div>
-                            {subHasBudget && (
-                              <>
-                                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                                  <div
-                                    className="h-full rounded-full transition-all"
-                                    style={{
-                                      width: `${Math.min(100, sub.budgetPercent ?? 0)}%`,
-                                      backgroundColor: cat.color,
-                                    }}
-                                  />
-                                </div>
-                                <p
-                                  className={cn(
-                                    "text-right text-xs",
-                                    subOverspent
-                                      ? "font-medium text-loss"
-                                      : "text-muted-foreground",
-                                  )}
-                                >
-                                  {(sub.budgetPercent ?? 0).toFixed(2)}% of budget
-                                  used
-                                </p>
-                              </>
-                            )}
+                  {selected && cat.subcategories.length > 0 && (
+                    <ul className="mb-2 ml-[3.25rem] mr-2 mt-1 space-y-1.5 border-l border-border pl-3 text-xs text-muted-foreground">
+                      {cat.subcategories.map((sub) => {
+                        const subHasBudget =
+                          sub.budgetLimit != null && sub.budgetLimit > 0;
+                        const subOverspent =
+                          subHasBudget && (sub.budgetPercent ?? 0) > 100;
+                        return (
+                          <li key={sub.id} className="flex justify-between gap-3">
+                            <span className="truncate">{sub.name}</span>
+                            <span
+                              className={cn(
+                                "shrink-0 tabular-nums",
+                                subOverspent ? "font-medium text-loss" : "text-foreground",
+                              )}
+                            >
+                              <Money amount={sub.total} currency={baseCurrency} />
+                              {subHasBudget && (
+                                <span className="text-muted-foreground">
+                                  <Money>
+                                    {" "}
+                                    / {formatMoney(sub.budgetLimit!, baseCurrency)}
+                                  </Money>
+                                </span>
+                              )}
+                            </span>
                           </li>
-                          );
-                        })}
-                      </ul>
-                    )}
+                        );
+                      })}
+                    </ul>
+                  )}
                 </li>
               );
             })}
           </ul>
-        )}
-      </div>
-    </div>
+
+          <div className="mt-auto flex items-center justify-between gap-3 border-t border-border pt-3 text-sm">
+            <span className="text-muted-foreground">Total</span>
+            <span className="font-semibold tabular-nums">
+              <Money amount={totalExpense} currency={baseCurrency} />
+            </span>
+          </div>
+          {active && (
+            <a
+              href="#activity"
+              className="mt-2 self-end rounded-md text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/10"
+            >
+              View {active.name} in activity
+            </a>
+          )}
+        </>
+      )}
+    </Card>
   );
 }

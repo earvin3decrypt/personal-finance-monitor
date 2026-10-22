@@ -7,6 +7,7 @@ export type CategoryWithChildren = {
   name: string;
   color: string;
   icon: string;
+  isFixed: boolean;
   children: { id: number; name: string; color: string; icon: string }[];
 };
 
@@ -18,6 +19,7 @@ export function getCategoryTree(): CategoryWithChildren[] {
     name: p.name,
     color: p.color,
     icon: p.icon,
+    isFixed: p.isFixed === 1,
     children: all
       .filter((c) => c.parentId === p.id)
       .map((c) => ({

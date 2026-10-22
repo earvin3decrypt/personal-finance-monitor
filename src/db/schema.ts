@@ -47,6 +47,8 @@ export const categories = sqliteTable("categories", {
   color: text("color").notNull().default("#3b82f6"),
   icon: text("icon").notNull().default("tag"),
   parentId: integer("parent_id"),
+  /** Recurring, non-discretionary spending (rent, utilities). Parent categories only. */
+  isFixed: integer("is_fixed").notNull().default(0),
 });
 
 export const expenses = sqliteTable("expenses", {

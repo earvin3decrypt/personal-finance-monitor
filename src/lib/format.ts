@@ -123,6 +123,37 @@ export function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** Today's date in the user's local timezone (`todayISO` is UTC-based). */
+export function localTodayISO(now = new Date()): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+/** Short day heading, e.g. "Wed 21 Oct". */
+export function formatDayHeading(date: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(parseLocalDate(date));
+}
+
+/** `YYYY-MM` → "October 2026". */
+export function formatMonthLong(month: string): string {
+  const [y, m] = month.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-GB", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(y, m - 1, 1));
+}
+
+/** Parses a user-typed amount ("12,50", "1 200.5"); null unless finite and > 0. */
+export function parseAmountInput(raw: string): number | null {
+  const normalized = raw.replace(/\s/g, "").replace(",", ".");
+  if (normalized === "") return null;
+  const value = Number(normalized);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
 /** Whole days from today until `isoDate` (negative if past). */
 export function daysFromToday(isoDate: string): number {
   const end = new Date(`${isoDate}T00:00:00`);

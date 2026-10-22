@@ -116,6 +116,9 @@ function seedCategories(database: Database.Database) {
   insertChild.run("Service", "#ef4444", "wrench", carId);
 
   const aptId = insertParent.run("Apartment", "#3b82f6", "home").lastInsertRowid;
+  database
+    .prepare("UPDATE categories SET is_fixed = 1 WHERE id = ?")
+    .run(aptId);
   insertChild.run("Rent", "#3b82f6", "home", aptId);
   insertChild.run("Utilities", "#3b82f6", "zap", aptId);
 
@@ -290,6 +293,14 @@ function migrate(database: Database.Database) {
   if (!columnExists(database, "categories", "parent_id")) {
     database.exec(
       "ALTER TABLE categories ADD COLUMN parent_id INTEGER REFERENCES categories(id) ON DELETE CASCADE",
+    );
+  }
+  if (!columnExists(database, "categories", "is_fixed")) {
+    database.exec(
+      "ALTER TABLE categories ADD COLUMN is_fixed INTEGER NOT NULL DEFAULT 0",
+    );
+    database.exec(
+      "UPDATE categories SET is_fixed = 1 WHERE parent_id IS NULL AND name = 'Apartment'",
     );
   }
   if (!columnExists(database, "expenses", "subcategory_id")) {

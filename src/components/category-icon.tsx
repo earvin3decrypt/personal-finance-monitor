@@ -29,6 +29,7 @@ import {
   Smartphone,
   Stethoscope,
   Tag,
+  Ticket,
   Train,
   Tv,
   Utensils,
@@ -71,6 +72,7 @@ export const ICONS: Record<string, LucideIcon> = {
   stethoscope: Stethoscope,
   tag: Tag,
   target: CircleDot,
+  ticket: Ticket,
   train: Train,
   tv: Tv,
   utensils: Utensils,
@@ -81,6 +83,27 @@ export const ICONS: Record<string, LucideIcon> = {
 };
 
 export const AVAILABLE_ICONS = Object.keys(ICONS);
+
+const NAME_ICON_HINTS: [RegExp, string][] = [
+  [/apartment|housing|rent|home/i, "home"],
+  [/grocer|supermarket/i, "shopping-bag"],
+  [/dining|restaurant|food|meal/i, "utensils"],
+  [/transport|train|metro|commute|travel/i, "train"],
+  [/entertain|cinema|movie|leisure/i, "ticket"],
+  [/shop/i, "shopping-bag"],
+  [/bank|fee/i, "landmark"],
+  [/health|medical|pharma/i, "heart-pulse"],
+  [/salary|income|work/i, "briefcase"],
+];
+
+/**
+ * Icon to display for a category: its chosen icon, or — when it still has the
+ * generic "tag" default — a semantic icon guessed from its name.
+ */
+export function resolveCategoryIcon(icon: string, name: string): string {
+  if (icon !== "tag" && ICONS[icon]) return icon;
+  return NAME_ICON_HINTS.find(([pattern]) => pattern.test(name))?.[1] ?? "tag";
+}
 
 export function CategoryIcon({
   icon,

@@ -1,12 +1,23 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
-import { Check, ChevronDown, X } from "lucide-react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useTransition,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
+import { Check, ChevronDown, Plus, X } from "lucide-react";
 import { saveExpense } from "@/app/actions/expenses";
 import { AccountBrandIcon } from "@/components/account-brand-icon";
-import { CategoryIcon } from "@/components/category-icon";
-import { Input } from "@/components/ui";
+import { CategoryIcon, resolveCategoryIcon } from "@/components/category-icon";
+import { Button, Input, Label, Modal } from "@/components/ui";
 import type { CategoryWithChildren } from "@/lib/categories";
+import { parseAmountInput } from "@/lib/format";
+import { readLastUsed, writeLastUsed } from "@/lib/last-used";
 import { cn } from "@/lib/utils";
 
 type Account = { id: number; name: string; currency: string; type?: string };
@@ -38,117 +49,197 @@ function inferAccountType(name: string, type?: string): string {
   return "checking";
 }
 
-export function ExpenseEntry({
-  categories,
-  accounts,
-  defaultCurrency,
-  defaultDate,
-}: {
+/** Header button that opens the full operation form in the app's modal. */
+export function NewOperationButton(props: {
   categories: CategoryWithChildren[];
   accounts: Account[];
   defaultCurrency: string;
   defaultDate: string;
 }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button type="button" onClick={() => setOpen(true)}>
+        <Plus className="h-4 w-4" aria-hidden />
+        New operation
+      </Button>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="New operation"
+        className="max-w-lg"
+      >
+        <ExpenseEntry {...props} autoFocus onSaved={() => setOpen(false)} />
+      </Modal>
+    </>
+  );
+}
+
+export function ExpenseEntry({
+  categories,
+  accounts,
+  defaultCurrency,
+  defaultDate,
+  autoFocus = false,
+  onSaved,
+}: {
+  categories: CategoryWithChildren[];
+  accounts: Account[];
+  defaultCurrency: string;
+  defaultDate: string;
+  autoFocus?: boolean;
+  onSaved?: () => void;
+}) {
+  const ids = useId();
   const [pending, startTransition] = useTransition();
   const [amount, setAmount] = useState("");
+  const [amountTouched, setAmountTouched] = useState(false);
   const [date, setDate] = useState(defaultDate);
   const [type, setType] = useState<"expense" | "income">("expense");
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(
     null,
   );
   const [selectedCategory, setSelectedCategory] =
-    useState<CategoryWithChildren | null>(categories[0] ?? null);
+    useState<CategoryWithChildren | null>(null);
   const [selectedSubId, setSelectedSubId] = useState<number | null>(null);
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
   const [note, setNote] = useState("");
-  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    const last = readLastUsed();
+    const lastCategory = categories.find((c) => c.id === last.categoryId);
+    if (lastCategory) setSelectedCategory(lastCategory);
+    if (accounts.some((a) => a.id === last.accountId)) {
+      setSelectedAccountId(last.accountId);
+    }
+  }, [categories, accounts]);
 
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId);
   const operationCurrency = selectedAccount?.currency ?? defaultCurrency;
+  const parsedAmount = parseAmountInput(amount);
+  const amountError =
+    amountTouched && parsedAmount == null ? "Enter an amount greater than 0" : null;
+  const showMissing = parsedAmount != null;
   const canSave =
-    !!amount && !!selectedAccountId && !!selectedCategory && !!date && !pending;
+    parsedAmount != null &&
+    !!selectedAccountId &&
+    !!selectedCategory &&
+    !!date &&
+    !pending;
 
   function handleSave() {
-    if (!amount || !selectedCategory || !selectedAccountId) return;
+    if (!canSave || parsedAmount == null || !selectedCategory || !selectedAccountId) {
+      return;
+    }
     const formData = new FormData();
     formData.set("accountId", String(selectedAccountId));
     formData.set("categoryId", String(selectedCategory.id));
     if (selectedSubId) formData.set("subcategoryId", String(selectedSubId));
     formData.set("type", type);
-    formData.set("amount", amount.replace(/\s/g, "").replace(",", "."));
+    formData.set("amount", String(parsedAmount));
     formData.set("currency", operationCurrency);
     formData.set("description", note);
     formData.set("date", date);
 
     startTransition(async () => {
       await saveExpense(formData);
+      writeLastUsed({
+        categoryId: selectedCategory.id,
+        accountId: selectedAccountId,
+      });
       setAmount("");
+      setAmountTouched(false);
       setNote("");
       setSelectedSubId(null);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      onSaved?.();
     });
   }
 
   if (accounts.length === 0) {
     return (
-      <p className="rounded-2xl border border-border bg-card p-5 text-sm text-loss">
+      <p className="text-sm text-loss">
         Add an account on the Accounts page before logging operations.
       </p>
     );
   }
 
   return (
-    <div className="flex h-full w-full flex-col rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-foreground">New operation</h2>
-        <div className="flex shrink-0 gap-1 rounded-full bg-muted p-0.5">
-          <TogglePill active={type === "expense"} onClick={() => setType("expense")}>
-            Expense
-          </TogglePill>
-          <TogglePill active={type === "income"} onClick={() => setType("income")}>
-            Income
-          </TogglePill>
-        </div>
+    <form
+      className="flex flex-col gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        handleSave();
+      }}
+      noValidate
+    >
+      <div
+        className="flex w-fit gap-1 rounded-full bg-muted p-0.5"
+        role="group"
+        aria-label="Operation type"
+      >
+        <TogglePill active={type === "expense"} onClick={() => setType("expense")}>
+          Expense
+        </TogglePill>
+        <TogglePill active={type === "income"} onClick={() => setType("income")}>
+          Income
+        </TogglePill>
       </div>
 
-      <div className="flex items-center gap-2 border-b border-border pb-4">
-        <span className="text-2xl text-muted-foreground">
-          {type === "expense" ? "−" : "+"}
-        </span>
-        <input
-          type="text"
-          inputMode="decimal"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="0"
-          className="min-w-0 flex-1 bg-transparent text-3xl font-semibold tabular-nums outline-none focus-visible:outline-none"
-        />
-        <span className="text-lg text-muted-foreground">{operationCurrency}</span>
-        {amount && (
-          <button
-            type="button"
-            onClick={() => setAmount("")}
-            className="rounded-full p-1 text-muted-foreground hover:bg-muted"
-          >
-            <X className="h-4 w-4" />
-          </button>
+      <div>
+        <Label htmlFor={`${ids}-amount`}>Amount</Label>
+        <div
+          className={cn(
+            "flex items-center gap-2 rounded-[10px] border border-border bg-card px-3 py-2 transition-[border-color,box-shadow] duration-150 focus-within:border-primary/50 focus-within:ring-4 focus-within:ring-primary/10",
+            amountError && "border-loss/50",
+          )}
+        >
+          <span className="text-xl text-muted-foreground" aria-hidden>
+            {type === "expense" ? "−" : "+"}
+          </span>
+          <input
+            id={`${ids}-amount`}
+            type="text"
+            inputMode="decimal"
+            autoComplete="off"
+            autoFocus={autoFocus}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            onBlur={() => setAmountTouched(amount !== "")}
+            placeholder="0.00"
+            aria-invalid={amountError ? true : undefined}
+            aria-describedby={amountError ? `${ids}-amount-error` : undefined}
+            className="min-w-0 flex-1 bg-transparent text-2xl font-semibold tabular-nums outline-none placeholder:text-muted-foreground"
+          />
+          <span className="text-sm text-muted-foreground">{operationCurrency}</span>
+          {amount && (
+            <button
+              type="button"
+              onClick={() => {
+                setAmount("");
+                setAmountTouched(false);
+              }}
+              className="rounded-full p-1 text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/10"
+              aria-label="Clear amount"
+            >
+              <X className="h-4 w-4" aria-hidden />
+            </button>
+          )}
+        </div>
+        {amountError && (
+          <p id={`${ids}-amount-error`} className="mt-1.5 text-xs text-loss">
+            {amountError}
+          </p>
         )}
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <Field label="Date">
-          <Input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            required
-            className="rounded-xl py-2.5"
-          />
-        </Field>
-
-        <Field label="Account">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field
+          id={`${ids}-account`}
+          label="Account"
+          error={showMissing && !selectedAccountId ? "Choose an account" : null}
+        >
           <Dropdown
+            id={`${ids}-account`}
             open={openPicker === "account"}
             onOpenChange={(open) => setOpenPicker(open ? "account" : null)}
             trigger={
@@ -156,10 +247,7 @@ export function ExpenseEntry({
                 <span className="flex min-w-0 items-center gap-2.5">
                   <AccountBrandIcon
                     name={selectedAccount.name}
-                    type={inferAccountType(
-                      selectedAccount.name,
-                      selectedAccount.type,
-                    )}
+                    type={inferAccountType(selectedAccount.name, selectedAccount.type)}
                     currency={selectedAccount.currency}
                     size="md"
                   />
@@ -173,16 +261,13 @@ export function ExpenseEntry({
                   </span>
                 </span>
               ) : (
-                <span className="text-sm text-muted-foreground">
-                  Select account
-                </span>
+                <span className="text-sm text-muted-foreground">Select account</span>
               )
             }
           >
             <ul className="max-h-64 overflow-y-auto py-1">
               {accounts.map((acc) => {
                 const selected = selectedAccountId === acc.id;
-                const accountType = inferAccountType(acc.name, acc.type);
                 return (
                   <li key={acc.id}>
                     <button
@@ -192,13 +277,13 @@ export function ExpenseEntry({
                         setOpenPicker(null);
                       }}
                       className={cn(
-                        "flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-muted",
+                        "flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-muted focus-visible:bg-muted focus-visible:outline-none",
                         selected && "bg-primary-light/40",
                       )}
                     >
                       <AccountBrandIcon
                         name={acc.name}
-                        type={accountType}
+                        type={inferAccountType(acc.name, acc.type)}
                         currency={acc.currency}
                         size="md"
                       />
@@ -211,7 +296,7 @@ export function ExpenseEntry({
                         </span>
                       </span>
                       {selected && (
-                        <Check className="h-4 w-4 shrink-0 text-primary" />
+                        <Check className="h-4 w-4 shrink-0 text-primary" aria-hidden />
                       )}
                     </button>
                   </li>
@@ -221,15 +306,20 @@ export function ExpenseEntry({
           </Dropdown>
         </Field>
 
-        <Field label="Category">
+        <Field
+          id={`${ids}-category`}
+          label="Category"
+          error={showMissing && !selectedCategory ? "Choose a category" : null}
+        >
           <Dropdown
+            id={`${ids}-category`}
             open={openPicker === "category"}
             onOpenChange={(open) => setOpenPicker(open ? "category" : null)}
             trigger={
               selectedCategory ? (
                 <span className="flex min-w-0 items-center gap-2.5">
                   <CategoryIcon
-                    icon={selectedCategory.icon}
+                    icon={resolveCategoryIcon(selectedCategory.icon, selectedCategory.name)}
                     color={selectedCategory.color}
                     size={16}
                   />
@@ -238,9 +328,7 @@ export function ExpenseEntry({
                   </span>
                 </span>
               ) : (
-                <span className="text-sm text-muted-foreground">
-                  Select category
-                </span>
+                <span className="text-sm text-muted-foreground">Select category</span>
               )
             }
           >
@@ -257,14 +345,18 @@ export function ExpenseEntry({
                         setOpenPicker(null);
                       }}
                       className={cn(
-                        "flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-muted",
+                        "flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-muted focus-visible:bg-muted focus-visible:outline-none",
                         selected && "bg-primary-light/40",
                       )}
                     >
-                      <CategoryIcon icon={cat.icon} color={cat.color} size={16} />
+                      <CategoryIcon
+                        icon={resolveCategoryIcon(cat.icon, cat.name)}
+                        color={cat.color}
+                        size={16}
+                      />
                       <span className="text-sm font-medium">{cat.name}</span>
                       {selected && (
-                        <Check className="ml-auto h-4 w-4 shrink-0 text-primary" />
+                        <Check className="ml-auto h-4 w-4 shrink-0 text-primary" aria-hidden />
                       )}
                     </button>
                   </li>
@@ -276,109 +368,173 @@ export function ExpenseEntry({
       </div>
 
       {selectedCategory && selectedCategory.children.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {selectedCategory.children.map((sub) => (
-            <button
-              key={sub.id}
-              type="button"
-              onClick={() =>
-                setSelectedSubId(selectedSubId === sub.id ? null : sub.id)
-              }
-              className={cn(
-                "rounded-full px-3 py-1.5 text-sm transition",
-                selectedSubId === sub.id
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-primary-light",
-              )}
-            >
-              {sub.name}
-            </button>
-          ))}
+        <div>
+          <p id={`${ids}-sub`} className="mb-1.5 text-[13px] font-medium text-muted-foreground">
+            Subcategory
+          </p>
+          <div className="flex flex-wrap gap-2" role="group" aria-labelledby={`${ids}-sub`}>
+            {selectedCategory.children.map((sub) => {
+              const selected = selectedSubId === sub.id;
+              return (
+                <button
+                  key={sub.id}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => setSelectedSubId(selected ? null : sub.id)}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/10",
+                    selected
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  {selected && <Check className="h-3.5 w-3.5" aria-hidden />}
+                  {sub.name}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      <div className="mt-auto space-y-3 pt-5">
-        <Input
-          type="text"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="Note for this operation (optional)"
-        />
-
-        <button
-          type="button"
-          disabled={!canSave}
-          onClick={handleSave}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-base font-semibold text-primary-foreground shadow-sm transition hover:opacity-95 disabled:opacity-50"
-        >
-          <Check className="h-5 w-5" />
-          {saved ? "Saved!" : pending ? "Saving…" : "Save"}
-        </button>
-
-        {!selectedAccountId && (
-          <p className="text-center text-sm text-muted-foreground">
-            Select an account to save
-          </p>
-        )}
-        {selectedAccountId && !amount && (
-          <p className="text-center text-sm text-muted-foreground">
-            Enter an amount to save
-          </p>
-        )}
-        {selectedAccountId && amount && !date && (
-          <p className="text-center text-sm text-muted-foreground">
-            Enter a date to save
-          </p>
-        )}
-        {selectedAccount && amount && date && (
-          <p className="text-center text-sm text-muted-foreground">
-            Will be recorded on{" "}
-            <span className="font-medium text-foreground">
-              {selectedAccount.name}
-            </span>
-          </p>
-        )}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <Label htmlFor={`${ids}-date`}>Date</Label>
+          <Input
+            id={`${ids}-date`}
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            required
+          />
+        </div>
+        <div>
+          <Label htmlFor={`${ids}-note`}>Note (optional)</Label>
+          <Input
+            id={`${ids}-note`}
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Merchant or detail"
+          />
+        </div>
       </div>
-    </div>
+
+      <Button type="submit" disabled={!canSave} className="w-full py-2.5">
+        <Check className="h-4 w-4" aria-hidden />
+        {pending ? "Saving…" : "Save operation"}
+      </Button>
+    </form>
   );
 }
 
 function Field({
+  id,
   label,
+  error,
   children,
 }: {
+  id: string;
   label: string;
+  error?: string | null;
   children: ReactNode;
 }) {
   return (
     <div>
-      <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <p id={`${id}-label`} className="mb-1.5 text-[13px] font-medium text-muted-foreground">
         {label}
       </p>
       {children}
+      {error && (
+        <p id={`${id}-error`} className="mt-1.5 text-xs text-loss">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
 
+const MENU_GAP = 4;
+const MENU_MAX_HEIGHT = 256; // max-h-64
+
 function Dropdown({
+  id,
   open,
   onOpenChange,
   trigger,
   children,
 }: {
+  id: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   trigger: ReactNode;
   children: ReactNode;
 }) {
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [coords, setCoords] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+  } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setCoords(null);
+      return;
+    }
+
+    function update() {
+      const el = triggerRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom - MENU_GAP;
+      const spaceAbove = rect.top - MENU_GAP;
+      // Prefer below: the menu is portaled, so modal overflow no longer matters.
+      const placeAbove = spaceBelow < 140 && spaceAbove > spaceBelow;
+      const available = Math.max(0, placeAbove ? spaceAbove : spaceBelow);
+      const maxHeight = Math.max(96, Math.min(MENU_MAX_HEIGHT, available));
+      setCoords({
+        top: placeAbove
+          ? rect.top - MENU_GAP - maxHeight
+          : rect.bottom + MENU_GAP,
+        left: rect.left,
+        width: rect.width,
+        maxHeight,
+      });
+    }
+
+    update();
+    window.addEventListener("resize", update);
+    // Capture scroll from modal body and the page so the menu stays aligned.
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [open]);
+
   return (
-    <div className="relative">
+    <div
+      className="relative"
+      onKeyDown={(e) => {
+        if (e.key === "Escape" && open) {
+          e.stopPropagation();
+          onOpenChange(false);
+        }
+      }}
+    >
       <button
+        ref={triggerRef}
         type="button"
+        id={id}
+        aria-labelledby={`${id}-label ${id}`}
+        aria-haspopup="true"
+        aria-expanded={open}
         onClick={() => onOpenChange(!open)}
         className={cn(
-          "flex w-full items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2.5 text-left transition hover:border-primary/30 hover:bg-muted/30",
-          open && "border-primary/40 ring-2 ring-primary/15",
+          "flex w-full items-center justify-between gap-2 rounded-[10px] border border-border bg-card px-3 py-2 text-left transition hover:border-primary/30 hover:bg-muted/30 focus-visible:border-primary/50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/10",
+          open && "border-primary/40 ring-4 ring-primary/10",
         )}
       >
         <span className="min-w-0 flex-1">{trigger}</span>
@@ -387,22 +543,36 @@ function Dropdown({
             "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
             open && "rotate-180",
           )}
+          aria-hidden
         />
       </button>
 
-      {open && (
-        <>
-          <button
-            type="button"
-            className="fixed inset-0 z-40 cursor-default"
-            aria-label="Close menu"
-            onClick={() => onOpenChange(false)}
-          />
-          <div className="absolute left-0 right-0 z-50 mt-1 overflow-hidden rounded-xl border border-border bg-card shadow-lg">
-            {children}
-          </div>
-        </>
-      )}
+      {open &&
+        coords &&
+        createPortal(
+          <>
+            <button
+              type="button"
+              tabIndex={-1}
+              className="fixed inset-0 z-[60] cursor-default"
+              aria-label="Close menu"
+              onClick={() => onOpenChange(false)}
+            />
+            <div
+              role="listbox"
+              className="fixed z-[61] overflow-y-auto rounded-xl border border-border bg-card shadow-lg"
+              style={{
+                top: coords.top,
+                left: coords.left,
+                width: coords.width,
+                maxHeight: coords.maxHeight,
+              }}
+            >
+              {children}
+            </div>
+          </>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -419,9 +589,10 @@ function TogglePill({
   return (
     <button
       type="button"
+      aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "rounded-full px-3 py-1.5 text-xs font-medium transition",
+        "rounded-full px-3 py-1.5 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/10",
         active
           ? "bg-primary text-primary-foreground shadow-sm"
           : "text-muted-foreground hover:text-foreground",
