@@ -122,7 +122,7 @@ export default async function ExpensesPage({
           <div className="flex flex-wrap items-center gap-3">
             <nav
               aria-label="Month"
-              className="flex items-center gap-1 rounded-[10px] border border-border bg-card p-0.5 [border-width:0.5px]"
+              className="flex select-none items-center gap-1 rounded-[10px] border border-border bg-card p-0.5 [border-width:0.5px]"
             >
               <MonthLink month={prevMonth} direction="prev" />
               <span

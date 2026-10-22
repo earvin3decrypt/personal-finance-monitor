@@ -6,7 +6,6 @@ import { searchExpensesAction } from "@/app/actions/expenses";
 import { CategoryIcon, resolveCategoryIcon } from "@/components/category-icon";
 import { ExpenseEditModal } from "@/components/expense-edit-modal";
 import { useExpenseFilters } from "@/components/expense-filter-context";
-import { ExpenseQuickAdd } from "@/components/expense-quick-add";
 import { Button, Input, Label, Select } from "@/components/ui";
 import { Money } from "@/components/money";
 import {
@@ -18,7 +17,7 @@ import type { CategoryWithChildren } from "@/lib/categories";
 import type { ExpenseOperation } from "@/lib/expense-stats";
 import { cn } from "@/lib/utils";
 
-const RECENT_LIMIT = 10;
+const RECENT_LIMIT = 6;
 
 type AccountOption = { id: number; name: string; currency: string };
 
@@ -108,12 +107,6 @@ export function OperationsList({
             )}
           </div>
         </div>
-
-        <ExpenseQuickAdd
-          categories={categories}
-          accounts={accounts}
-          defaultDate={today}
-        />
 
         <div className="grid gap-3 border-b border-border p-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,12rem)_minmax(0,12rem)]">
           <div>
