@@ -200,7 +200,7 @@ export async function getSavingsGoalsWithHistory(): Promise<SavingsGoalRow[]> {
       current: currentBase,
       target: targetBase,
       percent:
-        targetBase > 0 ? Math.min(100, (currentBase / targetBase) * 100) : 0,
+        targetBase > 0 ? (currentBase / targetBase) * 100 : 0,
       remaining,
       monthlyPace,
       monthContribution,
@@ -229,7 +229,7 @@ export async function getSavingsOverview(
   const totalCurrent = goalRows.reduce((sum, g) => sum + g.current, 0);
   const totalTarget = goalRows.reduce((sum, g) => sum + g.target, 0);
   const overallPercent =
-    totalTarget > 0 ? Math.min(100, (totalCurrent / totalTarget) * 100) : 0;
+    totalTarget > 0 ? (totalCurrent / totalTarget) * 100 : 0;
 
   const monthContributions = await sumContributionsInMonth(
     month,
