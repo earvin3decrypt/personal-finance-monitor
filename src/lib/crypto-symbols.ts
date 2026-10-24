@@ -50,6 +50,8 @@ export function getCryptoLogoSrc(
     return { src: `/logos/crypto/${lower}.svg`, local: true };
   }
 
+  if (!/^[a-z0-9]{1,15}$/.test(lower)) return null;
+
   return {
     src: `https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/128/color/${lower}.png`,
     local: false,

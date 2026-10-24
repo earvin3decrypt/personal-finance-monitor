@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, dialog } = require("electron");
+const { app, BrowserWindow, shell, dialog, session } = require("electron");
 const { spawn } = require("child_process");
 const path = require("path");
 const net = require("net");
@@ -132,6 +132,57 @@ function startNextServer() {
   });
 }
 
+function appOrigin() {
+  return `http://127.0.0.1:${port}`;
+}
+
+function isAppUrl(url) {
+  return url === appOrigin() || url.startsWith(`${appOrigin()}/`);
+}
+
+function isPublicWebUrl(url) {
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
+
+  const host = parsed.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  if (
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host.endsWith(".local") ||
+    host === "::1" ||
+    host === "0.0.0.0"
+  ) {
+    return false;
+  }
+
+  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const a = Number(ipv4[1]);
+    const b = Number(ipv4[2]);
+    if (a === 127 || a === 10 || a === 0) return false;
+    if (a === 169 && b === 254) return false;
+    if (a === 192 && b === 168) return false;
+    if (a === 172 && b >= 16 && b <= 31) return false;
+  }
+
+  return true;
+}
+
+function openExternalIfPublic(url) {
+  if (isPublicWebUrl(url)) shell.openExternal(url);
+}
+
+function preventForeignNavigation(event, url) {
+  if (isAppUrl(url)) return;
+  event.preventDefault();
+  openExternalIfPublic(url);
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -146,6 +197,11 @@ function createWindow() {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
+      nodeIntegrationInWorker: false,
+      nodeIntegrationInSubFrames: false,
+      sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
     },
   });
 
@@ -167,8 +223,13 @@ function createWindow() {
     },
   );
 
+  mainWindow.webContents.on("will-navigate", preventForeignNavigation);
+  mainWindow.webContents.on("will-redirect", preventForeignNavigation);
+  mainWindow.webContents.on("will-attach-webview", (event) => {
+    event.preventDefault();
+  });
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith("http")) shell.openExternal(url);
+    openExternalIfPublic(url);
     return { action: "deny" };
   });
 
@@ -180,6 +241,11 @@ function createWindow() {
 if (gotLock) {
   app.on("ready", async () => {
     try {
+      session.defaultSession.setPermissionRequestHandler(
+        (_webContents, _permission, callback) => {
+          callback(false);
+        },
+      );
       port = await findFreePort(3456);
       startNextServer();
       await waitForPort(port, "127.0.0.1", 60000);

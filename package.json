@@ -5,9 +5,9 @@
   "license": "MIT",
   "main": "electron/main.js",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --hostname 127.0.0.1",
     "build": "next build",
-    "start": "next start",
+    "start": "next start --hostname 127.0.0.1",
     "lint": "next lint",
     "electron:dev": "npm run build && electron .",
     "electron:build": "bash scripts/build-electron.sh",

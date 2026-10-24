@@ -1,11 +1,32 @@
 const DEFAULT_BASE_URL = "http://127.0.0.1:11434";
 const DEFAULT_MODEL = "llama3.2:3b";
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 
 /** Prevent overlapping Ollama runs (double-clicks / Strict Mode). */
 let ollamaInFlight: Promise<string> | null = null;
 
+/**
+ * Monthly insights include balances and category names. Only a loopback
+ * Ollama may receive them, and only the origin (no userinfo, path, or query).
+ */
 export function getOllamaBaseUrl(): string {
-  return (process.env.OLLAMA_BASE_URL ?? DEFAULT_BASE_URL).replace(/\/$/, "");
+  const raw = (process.env.OLLAMA_BASE_URL ?? DEFAULT_BASE_URL).trim();
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error("OLLAMA_BASE_URL is not a valid URL");
+  }
+  if (url.username || url.password) {
+    throw new Error("OLLAMA_BASE_URL must not include credentials");
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error("OLLAMA_BASE_URL must use http or https");
+  }
+  if (!LOOPBACK_HOSTS.has(url.hostname.toLowerCase())) {
+    throw new Error("OLLAMA_BASE_URL must point at this computer");
+  }
+  return url.origin;
 }
 
 export function getOllamaModel(): string {
@@ -16,11 +37,20 @@ export async function isOllamaAvailable(timeoutMs = 1500): Promise<boolean> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
+  let baseUrl: string;
   try {
-    const res = await fetch(`${getOllamaBaseUrl()}/api/tags`, {
+    baseUrl = getOllamaBaseUrl();
+  } catch {
+    clearTimeout(timer);
+    return false;
+  }
+
+  try {
+    const res = await fetch(`${baseUrl}/api/tags`, {
       method: "GET",
       signal: controller.signal,
       cache: "no-store",
+      redirect: "error",
     });
     return res.ok;
   } catch {
@@ -56,6 +86,7 @@ export async function ollamaChat(
 
       const res = await fetch(`${getOllamaBaseUrl()}/api/chat`, {
         method: "POST",
+        redirect: "error",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model,

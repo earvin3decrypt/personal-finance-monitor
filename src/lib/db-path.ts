@@ -64,6 +64,27 @@ export function listLegacyDatabasePaths(): string[] {
   return paths;
 }
 
+/**
+ * Restore is only allowed from the known app database locations.
+ * Symlinks are rejected so a swapped link cannot point the copy at another file.
+ */
+export function isAllowedDatabaseSource(sourcePath: string): boolean {
+  if (!sourcePath || sourcePath.includes("\0")) return false;
+
+  const resolved = path.resolve(sourcePath);
+  const allowed = listLegacyDatabasePaths().some(
+    (candidate) => path.resolve(candidate) === resolved,
+  );
+  if (!allowed) return false;
+
+  try {
+    const stat = fs.lstatSync(resolved);
+    return stat.isFile() && !stat.isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
 export function ensureDataDir(dbPath: string): void {
   const dir = path.dirname(dbPath);
   if (!fs.existsSync(dir)) {

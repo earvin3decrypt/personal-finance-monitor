@@ -1,6 +1,10 @@
 "use client";
 
-import { CategoryIcon, resolveCategoryIcon } from "@/components/category-icon";
+import {
+  CategoryIcon,
+  resolveCategoryIcon,
+  safeHexColor,
+} from "@/components/category-icon";
 import { useExpenseFilters } from "@/components/expense-filter-context";
 import { Card } from "@/components/ui";
 import { Money } from "@/components/money";
@@ -109,7 +113,7 @@ export function ExpenseCategoryBreakdown({
                         className="block h-full rounded-full"
                         style={{
                           width: `${Math.min(100, Math.max(0, cat.percent))}%`,
-                          backgroundColor: cat.color,
+                          backgroundColor: safeHexColor(cat.color),
                         }}
                       />
                     </span>

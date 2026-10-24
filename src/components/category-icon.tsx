@@ -84,6 +84,21 @@ export const ICONS: Record<string, LucideIcon> = {
 
 export const AVAILABLE_ICONS = Object.keys(ICONS);
 
+const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+export function isHexColor(value: string): boolean {
+  return HEX_COLOR.test(value);
+}
+
+/** User-supplied category colors are stored as text. Only a hex value is safe to paint. */
+export function safeHexColor(
+  color: string | null | undefined,
+  fallback = "#64748b",
+): string {
+  if (color && HEX_COLOR.test(color)) return color;
+  return fallback;
+}
+
 const NAME_ICON_HINTS: [RegExp, string][] = [
   [/apartment|housing|rent|home/i, "home"],
   [/grocer|supermarket/i, "shopping-bag"],
@@ -119,12 +134,13 @@ export function CategoryIcon({
   plain?: boolean;
 }) {
   const Icon = ICONS[icon] ?? Tag;
+  const paint = color ? safeHexColor(color, "var(--primary)") : "var(--primary)";
   if (plain) {
     return (
       <Icon
         size={size}
         className={className}
-        style={{ color: color ?? "var(--primary)" }}
+        style={{ color: paint }}
       />
     );
   }
@@ -137,8 +153,8 @@ export function CategoryIcon({
       style={{
         width: size + 16,
         height: size + 16,
-        backgroundColor: color ? `${color}22` : "var(--muted)",
-        color: color ?? "var(--primary)",
+        backgroundColor: color && isHexColor(color) ? `${color}22` : "var(--muted)",
+        color: paint,
       }}
     >
       <Icon size={size} />

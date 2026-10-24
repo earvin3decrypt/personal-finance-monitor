@@ -7,18 +7,15 @@ import {
   Card,
   PageHeader,
   Button,
-  Input,
   Select,
   Label,
 } from "@/components/ui";
-import { CategoryList } from "@/components/category-list";
-import { IconPicker } from "@/components/icon-picker";
+import { CategoryManager } from "@/components/category-manager";
 import { BlurAmountsToggle } from "@/components/blur-amounts-toggle";
 import { ThemeToggle } from "@/components/theme-toggle";
 import path from "path";
 import {
   updateBaseCurrency,
-  addCategory,
   forceSnapshot,
   refreshMarketData,
   importProjectDatabase,
@@ -92,42 +89,10 @@ export default function SettingsPage() {
         </Card>
 
         <Card className="p-0 overflow-hidden">
-          <div className="p-6 border-b border-border/50">
-            <h2 className="mb-4 font-medium">Categories & subcategories</h2>
-            <form action={addCategory} className="flex flex-wrap gap-4">
-              <div className="min-w-[140px] flex-1">
-                <Label htmlFor="name">Name</Label>
-                <Input id="name" name="name" required placeholder="Category name" />
-              </div>
-              <div>
-                <Label htmlFor="parentId">Parent (optional)</Label>
-                <Select id="parentId" name="parentId" defaultValue="">
-                  <option value="">Top-level category</option>
-                  {categoryTree.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="color">Color</Label>
-                <Input id="color" name="color" type="color" defaultValue="#3b82f6" />
-              </div>
-              <div className="min-w-[160px]">
-                <Label htmlFor="icon">Icon</Label>
-                <IconPicker name="icon" defaultValue="tag" />
-              </div>
-              <div className="flex items-end">
-                <Button type="submit" variant="secondary">
-                  Add
-                </Button>
-              </div>
-            </form>
+          <div className="border-b border-border/50 p-6">
+            <h2 className="font-medium">Categories & subcategories</h2>
           </div>
-          <div className="p-6 bg-background/30">
-            <CategoryList categoryTree={categoryTree} />
-          </div>
+          <CategoryManager categoryTree={categoryTree} />
         </Card>
 
         <Card>

@@ -3,8 +3,23 @@ import fs from "fs";
 import path from "path";
 import {
   ensureDataDir,
+  isAllowedDatabaseSource,
   listLegacyDatabasePaths,
 } from "@/lib/db-path";
+
+const COUNTABLE_TABLES = new Set([
+  "accounts",
+  "holdings",
+  "expenses",
+  "dividends",
+]);
+
+function quoteIdent(name: string): string {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+    throw new Error("Invalid SQL identifier");
+  }
+  return `"${name}"`;
+}
 
 export type DatabaseStats = {
   path: string;
@@ -33,9 +48,12 @@ function tableExists(db: Database.Database, table: string): boolean {
 }
 
 function countTable(db: Database.Database, table: string): number {
-  if (!tableExists(db, table)) return 0;
-  return (db.prepare(`SELECT COUNT(*) as c FROM ${table}`).get() as { c: number })
-    .c;
+  if (!COUNTABLE_TABLES.has(table) || !tableExists(db, table)) return 0;
+  return (
+    db.prepare(`SELECT COUNT(*) as c FROM ${quoteIdent(table)}`).get() as {
+      c: number;
+    }
+  ).c;
 }
 
 export function getDatabaseStats(dbPath: string): DatabaseStats {
@@ -51,7 +69,21 @@ export function getDatabaseStats(dbPath: string): DatabaseStats {
     };
   }
 
-  const db = new Database(dbPath, { readonly: true });
+  let db: Database.Database;
+  try {
+    db = new Database(dbPath, { readonly: true, fileMustExist: true });
+  } catch {
+    return {
+      path: dbPath,
+      exists: true,
+      accounts: 0,
+      holdings: 0,
+      expenses: 0,
+      dividends: 0,
+      score: -1,
+    };
+  }
+
   try {
     const accounts = countTable(db, "accounts");
     const holdings = countTable(db, "holdings");
@@ -131,6 +163,13 @@ export function ensureDatabasePreserved(canonicalPath: string): PreserveResult {
     };
   }
 
+  if (!isAllowedDatabaseSource(bestResolved) || !isSqliteFile(bestResolved)) {
+    return {
+      restored: false,
+      message: `Using database at ${canonicalPath} (${canonicalStats.accounts} accounts).`,
+    };
+  }
+
   let backupPath: string | undefined;
   if (fs.existsSync(canonicalPath) && canonicalStats.score >= 0) {
     backupPath = `${canonicalPath}.backup-${Date.now()}`;
@@ -147,10 +186,35 @@ export function ensureDatabasePreserved(canonicalPath: string): PreserveResult {
   };
 }
 
+function isSqliteFile(filePath: string): boolean {
+  let fd: number | null = null;
+  try {
+    fd = fs.openSync(filePath, "r");
+    const buf = Buffer.alloc(16);
+    const bytesRead = fs.readSync(fd, buf, 0, 16, 0);
+    return bytesRead === 16 && buf.toString("utf8") === "SQLite format 3\u0000";
+  } catch {
+    return false;
+  } finally {
+    if (fd != null) fs.closeSync(fd);
+  }
+}
+
 export function restoreDatabaseFromPath(
   canonicalPath: string,
   sourcePath: string,
 ): PreserveResult {
+  if (!isAllowedDatabaseSource(sourcePath)) {
+    return {
+      restored: false,
+      message: "That database location is not one of the app's known files.",
+    };
+  }
+
+  if (!isSqliteFile(sourcePath)) {
+    return { restored: false, message: "Source file is not a SQLite database." };
+  }
+
   if (!fs.existsSync(sourcePath)) {
     return { restored: false, message: "Source database file not found." };
   }

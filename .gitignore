@@ -28,12 +28,20 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files
-.env*.local
+# env files (keep the checked-in example only)
 .env
+.env.*
+!.env.example
 
-# database
+# database — never commit a finance file, wherever it sits
 /data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
 
 # electron build output
 /dist-electron/

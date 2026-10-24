@@ -2,7 +2,7 @@
 
 Single-user web app to track expenses, bank accounts, stock/ETF holdings, and net worth across multiple currencies. Runs entirely locally with SQLite — works offline for all core features; live prices and FX rates fall back to cached values when offline.
 
-> **Local-only by design.** There is no login and no cloud sync. Run it on your own machine and don't expose it to the internet. See [SECURITY.md](SECURITY.md).
+> **Local-only by design.** There is no login and no cloud sync. `npm run dev` and `npm start` listen on `127.0.0.1` only. Don't expose the port to the internet. See [SECURITY.md](SECURITY.md).
 
 ## Stack
 

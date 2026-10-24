@@ -4,22 +4,24 @@
 
 Personal Finance Monitor is a **single-user, local-only** app. It has no login, no user accounts, and no cloud sync. All data lives in a SQLite file on your own machine.
 
-Because there is no authentication, **do not expose the app to a network you don't trust** (for example by deploying `npm start` on a public server or forwarding its port). Anyone who can reach it can read and change your data.
+Because there is no authentication, **do not expose the app to a network you don't trust** (for example by forwarding its port). Anyone who can reach it can read and change your data.
+
+`npm run dev` and `npm start` listen on `127.0.0.1` only. Every request must use a loopback `Host` (`localhost`, `127.0.0.1`, or `::1`). That blocks a browser page on another site from reaching the app through DNS rebinding. Do not put the app behind a reverse proxy.
 
 The only network calls the app makes are:
 
 - Yahoo Finance chart API — stock/ETF prices (ticker symbols only)
 - Frankfurter — currency exchange rates
-- Ollama on `127.0.0.1` — optional monthly insight, runs locally
+- Ollama on this computer — optional monthly insight. The summary sent to Ollama includes balances and category names, so `OLLAMA_BASE_URL` must be a loopback address. Redirects are not followed.
 
-No balances, transactions, or account names are sent anywhere.
+Nothing is sent to a remote host except ticker symbols and a currency code.
 
 ## Your data
 
 - Dev database: `data/sqlite.db` (git-ignored)
 - Mac app database: `~/Library/Application Support/personal-finance-monitor/data/sqlite.db`
 
-Never commit these files, and don't paste real balances or screenshots of real data into issues or pull requests.
+Never commit these files, `.env` files, or database backups. Restoring a database from Settings only accepts those known files, not an arbitrary path. Don't paste real balances or screenshots of real data into issues or pull requests.
 
 ## Reporting a vulnerability
 

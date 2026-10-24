@@ -138,8 +138,13 @@ async function fetchPriceFromYfImport(
   };
 }
 
+const TICKER = /^[A-Z0-9][A-Z0-9.^:=-]{0,31}$/;
+
 async function fetchPriceFromApi(symbol: string): Promise<PriceInfo> {
   const upper = symbol.toUpperCase();
+  if (!TICKER.test(upper)) {
+    throw new Error("Invalid ticker symbol");
+  }
   let lastError: unknown;
 
   for (const fetcher of [fetchPriceFromYahooChart, fetchPriceFromYfImport]) {

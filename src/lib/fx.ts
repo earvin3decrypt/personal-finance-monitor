@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { fxRates } from "@/db/schema";
 import { and, desc, eq } from "drizzle-orm";
+import { isSupportedCurrency } from "@/lib/currencies";
 import { isMarketDataCacheFresh } from "@/lib/market-data-cache";
 
 export type FxFetchResult = {
@@ -10,6 +11,9 @@ export type FxFetchResult = {
 };
 
 async function fetchRatesFromApi(base: string): Promise<Record<string, number>> {
+  if (!isSupportedCurrency(base)) {
+    throw new Error("Unsupported currency");
+  }
   const url = `https://api.frankfurter.dev/v1/latest?base=${encodeURIComponent(base)}`;
   const res = await fetch(url, { next: { revalidate: 0 } });
   if (!res.ok) throw new Error(`FX API error: ${res.status}`);

@@ -9,12 +9,19 @@ type Db = BetterSQLite3Database<typeof schema>;
 let sqlite: Database.Database | null = null;
 let dbInstance: Db | null = null;
 
+function quoteIdent(name: string): string {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+    throw new Error("Invalid SQL identifier");
+  }
+  return `"${name}"`;
+}
+
 function columnExists(
   database: Database.Database,
   table: string,
   column: string,
 ): boolean {
-  const cols = database.prepare(`PRAGMA table_info(${table})`).all() as {
+  const cols = database.prepare(`PRAGMA table_info(${quoteIdent(table)})`).all() as {
     name: string;
   }[];
   return cols.some((c) => c.name === column);
@@ -55,51 +62,6 @@ function migrateDividendsNullableHolding(database: Database.Database) {
     DROP TABLE dividends;
     ALTER TABLE dividends_migrated RENAME TO dividends;
   `);
-}
-
-function seedPsp5Trades(database: Database.Database) {
-  const holding = database
-    .prepare("SELECT id FROM holdings WHERE UPPER(symbol) = 'PSP5.PA' LIMIT 1")
-    .get() as { id: number } | undefined;
-  if (!holding) return;
-
-  const tradeCount = database
-    .prepare("SELECT COUNT(*) as c FROM holding_trades WHERE holding_id = ?")
-    .get(holding.id) as { c: number };
-  if (tradeCount.c > 0) return;
-
-  const account = database
-    .prepare("SELECT id FROM accounts WHERE id = 4")
-    .get() as { id: number } | undefined;
-  const accountId = account?.id ?? null;
-  const now = new Date().toISOString();
-
-  const insert = database.prepare(`
-    INSERT INTO holding_trades (
-      holding_id, side, quantity, unit_price, total_amount, currency, date, account_id, created_at
-    ) VALUES (?, 'buy', ?, ?, ?, 'EUR', ?, ?, ?)
-  `);
-
-  insert.run(holding.id, 3, 32.8, 98.4, "2021-10-28", accountId, now);
-  insert.run(holding.id, 4, 32.6425, 130.57, "2022-10-18", accountId, now);
-
-  database
-    .prepare(
-      "UPDATE holdings SET quantity = 7, cost_basis = 32.71 WHERE id = ?",
-    )
-    .run(holding.id);
-}
-
-/** One-time fix: EWLD.PA avg cost was wrongly set to ~€39.63; broker shows €24.20. */
-function correctEwldCostBasis(database: Database.Database) {
-  database
-    .prepare(
-      `UPDATE holdings
-       SET cost_basis = 24.20
-       WHERE UPPER(symbol) = 'EWLD.PA'
-         AND ABS(cost_basis - 24.20) > 0.01`,
-    )
-    .run();
 }
 
 function seedCategories(database: Database.Database) {
@@ -402,9 +364,6 @@ function migrate(database: Database.Database) {
       created_at TEXT NOT NULL
     );
   `);
-
-  seedPsp5Trades(database);
-  correctEwldCostBasis(database);
 
   const settingsCount = database
     .prepare("SELECT COUNT(*) as c FROM settings")

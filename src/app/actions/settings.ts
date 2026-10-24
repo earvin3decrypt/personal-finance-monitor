@@ -1,8 +1,8 @@
 "use server";
 
 import { db } from "@/db";
-import { categories, settings } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { categories, expenses, settings } from "@/db/schema";
+import { eq, inArray, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { recordPortfolioSnapshot } from "@/lib/snapshot";
 import { refreshAllPrices } from "@/lib/prices";
@@ -10,6 +10,7 @@ import { getFxRates } from "@/lib/fx";
 import { getBaseCurrency } from "@/lib/settings";
 import { isSupportedCurrency } from "@/lib/currencies";
 import { isThemePreference, type ThemePreference } from "@/lib/theme";
+import { AVAILABLE_ICONS, isHexColor, safeHexColor } from "@/components/category-icon";
 import { importFromProjectDatabase } from "@/lib/db-import";
 import { restoreDatabaseFromPath } from "@/lib/db-preserve";
 import { resolveDatabasePath } from "@/lib/db-path";
@@ -68,6 +69,8 @@ export async function addCategory(formData: FormData) {
       ? Number(parentIdRaw)
       : null;
   if (!name) throw new Error("Name required");
+  if (!isHexColor(color)) throw new Error("Invalid color");
+  if (!AVAILABLE_ICONS.includes(icon)) throw new Error("Invalid icon");
 
   let resolvedColor = color;
   if (parentId != null) {
@@ -78,13 +81,17 @@ export async function addCategory(formData: FormData) {
       .limit(1)
       .all()[0];
     if (!parent) throw new Error("Parent category not found");
-    resolvedColor = parent.color;
+    resolvedColor = safeHexColor(parent.color);
   }
 
-  db.insert(categories).values({ name, color: resolvedColor, icon, parentId }).run();
+  const result = db
+    .insert(categories)
+    .values({ name, color: resolvedColor, icon, parentId })
+    .run();
   revalidatePath("/expenses");
   revalidatePath("/goals");
   revalidatePath("/settings");
+  return { id: Number(result.lastInsertRowid) };
 }
 
 export async function updateCategory(formData: FormData) {
@@ -105,10 +112,14 @@ export async function updateCategory(formData: FormData) {
 
   const updates: { name: string; icon?: string; color?: string } = { name };
   if (iconRaw != null && String(iconRaw).trim() !== "") {
-    updates.icon = String(iconRaw).trim();
+    const icon = String(iconRaw).trim();
+    if (!AVAILABLE_ICONS.includes(icon)) throw new Error("Invalid icon");
+    updates.icon = icon;
   }
   if (colorRaw != null && String(colorRaw).trim() !== "") {
-    updates.color = String(colorRaw).trim();
+    const color = String(colorRaw).trim();
+    if (!isHexColor(color)) throw new Error("Invalid color");
+    updates.color = color;
   }
 
   db.update(categories).set(updates).where(eq(categories.id, id)).run();
@@ -141,10 +152,69 @@ export async function renameCategory(formData: FormData) {
 
 export async function deleteCategory(formData: FormData) {
   const id = Number(formData.get("id"));
+  if (!id || Number.isNaN(id)) return { error: "Invalid category" };
+
+  const category = db
+    .select()
+    .from(categories)
+    .where(eq(categories.id, id))
+    .limit(1)
+    .all()[0];
+  if (!category) return { error: "Category not found" };
+
+  const children = db
+    .select()
+    .from(categories)
+    .where(eq(categories.parentId, id))
+    .all();
+  const ids = [id, ...children.map((c) => c.id)];
+
+  const usage = db
+    .select({ count: sql<number>`count(*)` })
+    .from(expenses)
+    .where(
+      or(inArray(expenses.categoryId, ids), inArray(expenses.subcategoryId, ids)),
+    )
+    .all()[0];
+  const count = Number(usage?.count ?? 0);
+  if (count > 0) {
+    return {
+      error: `Used by ${count} operation${count === 1 ? "" : "s"} — reassign them first`,
+    };
+  }
+
+  for (const child of children) {
+    db.delete(categories).where(eq(categories.id, child.id)).run();
+  }
   db.delete(categories).where(eq(categories.id, id)).run();
   revalidatePath("/expenses");
   revalidatePath("/goals");
   revalidatePath("/settings");
+  return { ok: true as const };
+}
+
+export async function setCategoryFixed(id: number, isFixed: boolean) {
+  if (!id || Number.isNaN(id)) throw new Error("Invalid category");
+
+  const category = db
+    .select()
+    .from(categories)
+    .where(eq(categories.id, id))
+    .limit(1)
+    .all()[0];
+  if (!category) throw new Error("Category not found");
+  if (category.parentId != null) {
+    throw new Error("Only top-level categories can be marked fixed");
+  }
+
+  db.update(categories)
+    .set({ isFixed: isFixed ? 1 : 0 })
+    .where(eq(categories.id, id))
+    .run();
+
+  revalidatePath("/settings");
+  revalidatePath("/expenses");
+  revalidatePath("/");
 }
 
 export async function updateCategoryParent(formData: FormData) {
@@ -191,7 +261,7 @@ export async function updateCategoryParent(formData: FormData) {
   if (parentId != null) {
     const parent = all.find((c) => c.id === parentId)!;
     db.update(categories)
-      .set({ color: parent.color })
+      .set({ color: safeHexColor(parent.color) })
       .where(eq(categories.id, id))
       .run();
   }
