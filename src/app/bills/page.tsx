@@ -25,18 +25,11 @@ export default async function BillsPage() {
       id: a.id,
       name: a.name,
       currency: a.currency,
+      type: a.type,
     }));
 
   return (
     <div className="mx-auto max-w-6xl">
-      <header className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight">Bills</h1>
-        <p className="mt-1 text-muted-foreground">
-          Flag recurring payments, set due dates, and get reminders before
-          they&apos;re due
-        </p>
-      </header>
-
       <BillsView
         baseCurrency={baseCurrency}
         bills={bills}

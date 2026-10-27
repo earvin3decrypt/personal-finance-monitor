@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState, useTransition } from "react";
 import {
   AlertTriangle,
   CalendarClock,
   Check,
   Pencil,
+  Plus,
   SkipForward,
   Trash2,
   X,
@@ -17,14 +18,32 @@ import {
   skipBill,
   trackAsBill,
 } from "@/app/actions/bills";
-import { Card, StatCard, Button, Input, Select, Label } from "@/components/ui";
+import { AccountBrandIcon } from "@/components/account-brand-icon";
+import { CategoryIcon, resolveCategoryIcon } from "@/components/category-icon";
+import { Money } from "@/components/money";
+import {
+  Dropdown,
+  Field,
+  inferAccountType,
+  TogglePill,
+} from "@/components/operation-form-parts";
+import {
+  Card,
+  StatCard,
+  Button,
+  Input,
+  Select,
+  Label,
+  Modal,
+} from "@/components/ui";
 import type { BillRow, TrackableRecurringItem } from "@/lib/bills";
 import type { CategoryWithChildren } from "@/lib/categories";
-import { formatDate, formatMoney, todayISO } from "@/lib/format";
-import { Money } from "@/components/money";
+import { formatDate, formatMoney, parseAmountInput, todayISO } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-type AccountOption = { id: number; name: string; currency: string };
+type AccountOption = { id: number; name: string; currency: string; type?: string };
+
+type OpenPicker = "account" | "category" | null;
 
 type BillsViewProps = {
   baseCurrency: string;
@@ -50,19 +69,6 @@ function dueLabel(bill: BillRow): string {
   return `Due in ${bill.daysUntilDue} days`;
 }
 
-function currencySymbol(currency: string, locale = "en-US"): string {
-  return (
-    new Intl.NumberFormat(locale, {
-      style: "currency",
-      currency,
-      currencyDisplay: "narrowSymbol",
-      maximumFractionDigits: 0,
-    })
-      .formatToParts(0)
-      .find((p) => p.type === "currency")?.value ?? currency
-  );
-}
-
 export function BillsView({
   baseCurrency,
   bills,
@@ -73,7 +79,7 @@ export function BillsView({
   categories,
 }: BillsViewProps) {
   const [editing, setEditing] = useState<BillRow | null>(null);
-  const [showForm, setShowForm] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
   const [trackingId, setTrackingId] = useState<number | null>(null);
 
   const overdue = bills.filter((b) => b.status === "overdue");
@@ -82,8 +88,37 @@ export function BillsView({
   const ended = bills.filter((b) => b.status === "ended");
   const activeCount = bills.length - ended.length;
 
+  function openAdd() {
+    setEditing(null);
+    setFormOpen(true);
+  }
+
+  function openEdit(bill: BillRow) {
+    setEditing(bill);
+    setFormOpen(true);
+  }
+
+  function closeForm() {
+    setEditing(null);
+    setFormOpen(false);
+  }
+
   return (
     <div className="space-y-8">
+      <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Bills</h1>
+          <p className="mt-1 text-muted-foreground">
+            Flag recurring payments, set due dates, and get reminders before
+            they&apos;re due
+          </p>
+        </div>
+        <Button type="button" onClick={openAdd}>
+          <Plus className="h-4 w-4" aria-hidden />
+          Add bill
+        </Button>
+      </header>
+
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
           label="Monthly bills"
@@ -117,10 +152,7 @@ export function BillsView({
           tone="danger"
           bills={overdue}
           baseCurrency={baseCurrency}
-          onEdit={(b) => {
-            setEditing(b);
-            setShowForm(true);
-          }}
+          onEdit={openEdit}
         />
       )}
       {dueSoon.length > 0 && (
@@ -129,10 +161,7 @@ export function BillsView({
           tone="warn"
           bills={dueSoon}
           baseCurrency={baseCurrency}
-          onEdit={(b) => {
-            setEditing(b);
-            setShowForm(true);
-          }}
+          onEdit={openEdit}
         />
       )}
       {upcoming.length > 0 && (
@@ -141,10 +170,7 @@ export function BillsView({
           tone="neutral"
           bills={upcoming}
           baseCurrency={baseCurrency}
-          onEdit={(b) => {
-            setEditing(b);
-            setShowForm(true);
-          }}
+          onEdit={openEdit}
         />
       )}
       {ended.length > 0 && (
@@ -153,10 +179,7 @@ export function BillsView({
           tone="ended"
           bills={ended}
           baseCurrency={baseCurrency}
-          onEdit={(b) => {
-            setEditing(b);
-            setShowForm(true);
-          }}
+          onEdit={openEdit}
         />
       )}
 
@@ -167,7 +190,7 @@ export function BillsView({
             <div>
               <p className="font-medium">No bills tracked yet</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Add a subscription or bill below, or promote an existing
+                Add a subscription or bill with Add bill, or promote an existing
                 recurring expense from Forecast.
               </p>
             </div>
@@ -219,43 +242,21 @@ export function BillsView({
         </Card>
       )}
 
-      <Card>
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold">
-            {editing ? "Edit bill" : "Add bill / subscription"}
-          </h2>
-          {(showForm || editing) && (
-            <button
-              type="button"
-              onClick={() => {
-                setEditing(null);
-                setShowForm(false);
-              }}
-              className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted"
-              aria-label="Close form"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-        {!showForm && !editing ? (
-          <Button type="button" onClick={() => setShowForm(true)}>
-            Add bill
-          </Button>
-        ) : (
-          <BillForm
-            key={editing?.id ?? "new"}
-            bill={editing}
-            accounts={accounts}
-            categories={categories}
-            defaultCurrency={baseCurrency}
-            onCancel={() => {
-              setEditing(null);
-              setShowForm(false);
-            }}
-          />
-        )}
-      </Card>
+      <Modal
+        open={formOpen}
+        onClose={closeForm}
+        title={editing ? "Edit bill" : "Add bill"}
+        className="max-w-lg"
+      >
+        <BillForm
+          key={editing?.id ?? "new"}
+          bill={editing}
+          accounts={accounts}
+          categories={categories}
+          defaultCurrency={baseCurrency}
+          onCancel={closeForm}
+        />
+      </Modal>
     </div>
   );
 }
@@ -434,186 +435,392 @@ function BillForm({
   defaultCurrency: string;
   onCancel: () => void;
 }) {
-  const [categoryId, setCategoryId] = useState<number | "">(
-    bill?.categoryId ?? categories[0]?.id ?? "",
+  const ids = useId();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const [name, setName] = useState(bill?.name ?? "");
+  const [amount, setAmount] = useState(
+    bill?.amount != null ? String(bill.amount) : "",
   );
-  const [accountId, setAccountId] = useState<number | "">(
-    bill?.accountId ?? accounts[0]?.id ?? "",
-  );
+  const [amountTouched, setAmountTouched] = useState(false);
   const [cycle, setCycle] = useState<"month" | "year">(
     bill?.billingCycle ?? "month",
   );
-
-  const selectedCategory = useMemo(
-    () => categories.find((c) => c.id === categoryId),
-    [categories, categoryId],
+  const [accountId, setAccountId] = useState<number | null>(
+    bill?.accountId ?? accounts[0]?.id ?? null,
   );
+  const [categoryId, setCategoryId] = useState<number | null>(
+    bill?.categoryId ?? categories[0]?.id ?? null,
+  );
+  const [subcategoryId, setSubcategoryId] = useState<number | null>(
+    bill?.subcategoryId ?? null,
+  );
+  const [nextDueDate, setNextDueDate] = useState(
+    bill?.nextDueDate ?? todayISO(),
+  );
+  const [endDate, setEndDate] = useState(bill?.endDate ?? "");
+  const [reminderDays, setReminderDays] = useState(
+    String(bill?.reminderDays ?? 3),
+  );
+  const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
 
   const selectedAccount = accounts.find((a) => a.id === accountId);
-  const currency = selectedAccount?.currency ?? bill?.currency ?? defaultCurrency;
+  const selectedCategory = useMemo(
+    () => categories.find((c) => c.id === categoryId) ?? null,
+    [categories, categoryId],
+  );
+  const currency =
+    selectedAccount?.currency ?? bill?.currency ?? defaultCurrency;
+  const parsedAmount = parseAmountInput(amount);
+  const amountError =
+    amountTouched && parsedAmount == null
+      ? "Enter an amount greater than 0"
+      : null;
+  const canSave =
+    name.trim().length > 0 &&
+    parsedAmount != null &&
+    !!accountId &&
+    !!categoryId &&
+    !!nextDueDate &&
+    !pending;
+
+  function handleSave() {
+    if (!canSave || parsedAmount == null || !accountId || !categoryId) return;
+
+    const formData = new FormData();
+    if (bill) formData.set("id", String(bill.id));
+    formData.set("name", name.trim());
+    formData.set("amount", String(parsedAmount));
+    formData.set("currency", currency);
+    formData.set("type", "expense");
+    formData.set("billingCycle", cycle);
+    formData.set("nextDueDate", nextDueDate);
+    if (endDate) formData.set("endDate", endDate);
+    formData.set("reminderDays", reminderDays);
+    formData.set("accountId", String(accountId));
+    formData.set("categoryId", String(categoryId));
+    if (subcategoryId) formData.set("subcategoryId", String(subcategoryId));
+
+    setError(null);
+    startTransition(async () => {
+      try {
+        await saveBill(formData);
+        onCancel();
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Could not save bill",
+        );
+      }
+    });
+  }
 
   return (
     <form
-      action={async (fd) => {
-        await saveBill(fd);
-        onCancel();
+      className="flex flex-col gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        handleSave();
       }}
-      className="space-y-3"
+      noValidate
     >
-      {bill && <input type="hidden" name="id" value={bill.id} />}
-      <input type="hidden" name="type" value="expense" />
-      <input type="hidden" name="currency" value={currency} />
-
       <div>
-        <Label htmlFor="bill-name">Name</Label>
+        <Label htmlFor={`${ids}-name`}>Name</Label>
         <Input
-          id="bill-name"
-          name="name"
+          id={`${ids}-name`}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
           placeholder="e.g. Netflix, Rent, Insurance"
-          defaultValue={bill?.name ?? ""}
+          autoFocus={!bill}
           required
         />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <Label htmlFor="bill-amount">Amount</Label>
-          <div className="flex overflow-hidden rounded-lg border border-border focus-within:ring-2 focus-within:ring-primary/20">
-            <span className="flex shrink-0 items-center border-r border-border bg-muted/30 px-3 text-sm tabular-nums text-muted-foreground">
-              {currencySymbol(currency)}
-            </span>
-            <input
-              id="bill-amount"
-              name="amount"
-              type="number"
-              step="0.01"
-              min="0.01"
-              defaultValue={bill?.amount ?? ""}
-              required
-              className="min-w-0 flex-1 border-0 bg-transparent px-3 py-2 text-sm outline-none"
-            />
-          </div>
-        </div>
-        <div>
-          <Label htmlFor="bill-cycle">Billing cycle</Label>
-          <Select
-            id="bill-cycle"
-            name="billingCycle"
-            value={cycle}
-            onChange={(e) => setCycle(e.target.value as "month" | "year")}
-          >
-            <option value="month">Monthly</option>
-            <option value="year">Yearly</option>
-          </Select>
-        </div>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <Label htmlFor="bill-due">Next due date</Label>
-          <Input
-            id="bill-due"
-            name="nextDueDate"
-            type="date"
-            defaultValue={bill?.nextDueDate ?? todayISO()}
-            required
-          />
-        </div>
-        <div>
-          <Label htmlFor="bill-end">Ends on (optional)</Label>
-          <Input
-            id="bill-end"
-            name="endDate"
-            type="date"
-            defaultValue={bill?.endDate ?? ""}
-          />
-        </div>
+      <div
+        className="flex w-fit gap-1 rounded-full bg-muted p-0.5"
+        role="group"
+        aria-label="Billing cycle"
+      >
+        <TogglePill
+          active={cycle === "month"}
+          onClick={() => setCycle("month")}
+        >
+          Monthly
+        </TogglePill>
+        <TogglePill active={cycle === "year"} onClick={() => setCycle("year")}>
+          Yearly
+        </TogglePill>
       </div>
 
       <div>
-        <Label htmlFor="bill-reminder">Remind me (days before)</Label>
-        <Input
-          id="bill-reminder"
-          name="reminderDays"
-          type="number"
-          min={0}
-          max={30}
-          defaultValue={bill?.reminderDays ?? 3}
-          required
-        />
+        <Label htmlFor={`${ids}-amount`}>Amount</Label>
+        <div
+          className={cn(
+            "flex items-center gap-2 rounded-[10px] border border-border bg-card px-3 py-2 transition-[border-color,box-shadow] duration-150 focus-within:border-primary/50 focus-within:ring-4 focus-within:ring-primary/10",
+            amountError && "border-loss/50",
+          )}
+        >
+          <span className="text-xl text-muted-foreground" aria-hidden>
+            −
+          </span>
+          <input
+            id={`${ids}-amount`}
+            type="text"
+            inputMode="decimal"
+            autoComplete="off"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            onBlur={() => setAmountTouched(amount !== "")}
+            placeholder="0.00"
+            aria-invalid={amountError ? true : undefined}
+            aria-describedby={amountError ? `${ids}-amount-error` : undefined}
+            className="min-w-0 flex-1 bg-transparent text-2xl font-semibold tabular-nums outline-none placeholder:text-muted-foreground"
+          />
+          <span className="text-sm text-muted-foreground">{currency}</span>
+          {amount && (
+            <button
+              type="button"
+              onClick={() => {
+                setAmount("");
+                setAmountTouched(false);
+              }}
+              className="rounded-full p-1 text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/10"
+              aria-label="Clear amount"
+            >
+              <X className="h-4 w-4" aria-hidden />
+            </button>
+          )}
+        </div>
+        {amountError && (
+          <p id={`${ids}-amount-error`} className="mt-1.5 text-xs text-loss">
+            {amountError}
+          </p>
+        )}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <Label htmlFor="bill-account">Pay from account</Label>
-          <Select
-            id="bill-account"
-            name="accountId"
-            value={accountId === "" ? "" : String(accountId)}
-            onChange={(e) =>
-              setAccountId(e.target.value ? Number(e.target.value) : "")
+        <Field id={`${ids}-account`} label="Account">
+          <Dropdown
+            id={`${ids}-account`}
+            open={openPicker === "account"}
+            onOpenChange={(open) => setOpenPicker(open ? "account" : null)}
+            trigger={
+              selectedAccount ? (
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <AccountBrandIcon
+                    name={selectedAccount.name}
+                    type={inferAccountType(
+                      selectedAccount.name,
+                      selectedAccount.type,
+                    )}
+                    currency={selectedAccount.currency}
+                    size="md"
+                  />
+                  <span className="min-w-0 flex-1 text-left">
+                    <span className="block truncate text-sm font-medium">
+                      {selectedAccount.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {selectedAccount.currency}
+                    </span>
+                  </span>
+                </span>
+              ) : (
+                <span className="text-sm text-muted-foreground">
+                  Select account
+                </span>
+              )
             }
-            required
           >
-            <option value="" disabled>
-              Select account
-            </option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name} ({a.currency})
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="bill-category">Category</Label>
-          <Select
-            id="bill-category"
-            name="categoryId"
-            value={categoryId === "" ? "" : String(categoryId)}
-            onChange={(e) =>
-              setCategoryId(e.target.value ? Number(e.target.value) : "")
+            <ul className="max-h-64 overflow-y-auto py-1">
+              {accounts.map((acc) => {
+                const selected = accountId === acc.id;
+                return (
+                  <li key={acc.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAccountId(acc.id);
+                        setOpenPicker(null);
+                      }}
+                      className={cn(
+                        "flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-muted focus-visible:bg-muted focus-visible:outline-none",
+                        selected && "bg-primary-light/40",
+                      )}
+                    >
+                      <AccountBrandIcon
+                        name={acc.name}
+                        type={inferAccountType(acc.name, acc.type)}
+                        currency={acc.currency}
+                        size="md"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">
+                          {acc.name}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {acc.currency}
+                        </span>
+                      </span>
+                      {selected && (
+                        <Check
+                          className="h-4 w-4 shrink-0 text-primary"
+                          aria-hidden
+                        />
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </Dropdown>
+        </Field>
+
+        <Field id={`${ids}-category`} label="Category">
+          <Dropdown
+            id={`${ids}-category`}
+            open={openPicker === "category"}
+            onOpenChange={(open) => setOpenPicker(open ? "category" : null)}
+            trigger={
+              selectedCategory ? (
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <CategoryIcon
+                    icon={resolveCategoryIcon(
+                      selectedCategory.icon,
+                      selectedCategory.name,
+                    )}
+                    color={selectedCategory.color}
+                    size={16}
+                  />
+                  <span className="truncate text-sm font-medium">
+                    {selectedCategory.name}
+                  </span>
+                </span>
+              ) : (
+                <span className="text-sm text-muted-foreground">
+                  Select category
+                </span>
+              )
             }
-            required
           >
-            <option value="" disabled>
-              Select category
-            </option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </Select>
-        </div>
+            <ul className="max-h-64 overflow-y-auto py-1">
+              {categories.map((cat) => {
+                const selected = categoryId === cat.id;
+                return (
+                  <li key={cat.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCategoryId(cat.id);
+                        setSubcategoryId(null);
+                        setOpenPicker(null);
+                      }}
+                      className={cn(
+                        "flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-muted focus-visible:bg-muted focus-visible:outline-none",
+                        selected && "bg-primary-light/40",
+                      )}
+                    >
+                      <CategoryIcon
+                        icon={resolveCategoryIcon(cat.icon, cat.name)}
+                        color={cat.color}
+                        size={16}
+                      />
+                      <span className="text-sm font-medium">{cat.name}</span>
+                      {selected && (
+                        <Check
+                          className="ml-auto h-4 w-4 shrink-0 text-primary"
+                          aria-hidden
+                        />
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </Dropdown>
+        </Field>
       </div>
 
       {selectedCategory && selectedCategory.children.length > 0 && (
         <div>
-          <Label htmlFor="bill-subcategory">Subcategory (optional)</Label>
-          <Select
-            id="bill-subcategory"
-            name="subcategoryId"
-            defaultValue={bill?.subcategoryId ?? ""}
+          <p
+            id={`${ids}-sub`}
+            className="mb-1.5 text-[13px] font-medium text-muted-foreground"
           >
-            <option value="">None</option>
-            {selectedCategory.children.map((sub) => (
-              <option key={sub.id} value={sub.id}>
-                {sub.name}
-              </option>
-            ))}
-          </Select>
+            Subcategory
+          </p>
+          <div
+            className="flex flex-wrap gap-2"
+            role="group"
+            aria-labelledby={`${ids}-sub`}
+          >
+            {selectedCategory.children.map((sub) => {
+              const selected = subcategoryId === sub.id;
+              return (
+                <button
+                  key={sub.id}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() =>
+                    setSubcategoryId(selected ? null : sub.id)
+                  }
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/10",
+                    selected
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  {selected && <Check className="h-3.5 w-3.5" aria-hidden />}
+                  {sub.name}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      <div className="flex gap-2 pt-1">
-        <Button type="submit" className="flex-1">
-          {bill ? "Save changes" : "Add bill"}
-        </Button>
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          Cancel
-        </Button>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <Label htmlFor={`${ids}-due`}>Next due date</Label>
+          <Input
+            id={`${ids}-due`}
+            type="date"
+            value={nextDueDate}
+            onChange={(e) => setNextDueDate(e.target.value)}
+            required
+          />
+        </div>
+        <div>
+          <Label htmlFor={`${ids}-end`}>Ends on (optional)</Label>
+          <Input
+            id={`${ids}-end`}
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
+        </div>
       </div>
+
+      <div>
+        <Label htmlFor={`${ids}-reminder`}>Remind me (days before)</Label>
+        <Input
+          id={`${ids}-reminder`}
+          type="number"
+          min={0}
+          max={30}
+          value={reminderDays}
+          onChange={(e) => setReminderDays(e.target.value)}
+          required
+        />
+      </div>
+
+      {error && <p className="text-xs text-loss">{error}</p>}
+
+      <Button type="submit" disabled={!canSave} className="w-full py-2.5">
+        <Check className="h-4 w-4" aria-hidden />
+        {pending ? "Saving…" : bill ? "Save changes" : "Add bill"}
+      </Button>
     </form>
   );
 }
