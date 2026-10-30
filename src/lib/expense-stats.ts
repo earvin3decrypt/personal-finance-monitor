@@ -507,8 +507,6 @@ export async function getExpenseStats(month: string) {
     scheduledExpense: round2(scheduledExpense),
     scheduledCount,
     trend,
-    /** Kept for existing consumers (AI insight); same value as `trend.percent`. */
-    trendPercent: trend.percent ?? 0,
     daily,
     breakdown,
     operations: rows.map(mapExpenseOperationRow),

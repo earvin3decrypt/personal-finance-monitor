@@ -80,7 +80,7 @@ The database is stored in `~/Library/Application Support/personal-finance-monito
 
 ## Configuration
 
-Optional environment variables are listed in [`.env.example`](.env.example). Copy it to `.env.local` to override the database path or the local Ollama model used for monthly insights.
+Optional environment variables are listed in [`.env.example`](.env.example). Copy it to `.env.local` to override the database path.
 
 ## Privacy
 

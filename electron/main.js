@@ -95,8 +95,6 @@ function startNextServer() {
     NODE_ENV: "production",
     ELECTRON_PACKAGED: "true",
     FINANCE_DB_PATH: financeDbPath,
-    OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434",
-    OLLAMA_MODEL: process.env.OLLAMA_MODEL || "llama3.2:3b",
   };
 
   serverProcess = spawn(process.execPath, [serverScript], {

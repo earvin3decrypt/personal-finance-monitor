@@ -12,7 +12,6 @@ The only network calls the app makes are:
 
 - Yahoo Finance chart API — stock/ETF prices (ticker symbols only)
 - Frankfurter — currency exchange rates
-- Ollama on this computer — optional monthly insight. The summary sent to Ollama includes balances and category names, so `OLLAMA_BASE_URL` must be a loopback address. Redirects are not followed.
 
 Nothing is sent to a remote host except ticker symbols and a currency code.
 
