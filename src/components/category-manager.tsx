@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   ChevronRight,
   Pencil,
@@ -577,6 +578,7 @@ function CategoryDetail({
             <SubcategoryRow
               key={child.id}
               child={child}
+              parentName={category.name}
               parentColor={category.color}
               parentId={category.id}
               otherParents={allParents.filter((p) => p.id !== category.id)}
@@ -595,15 +597,18 @@ function CategoryDetail({
 
 function SubcategoryRow({
   child,
+  parentName,
   parentColor,
   parentId,
   otherParents,
 }: {
   child: { id: number; name: string; color: string; icon: string };
+  parentName: string;
   parentColor: string;
   parentId: number;
   otherParents: CategoryWithChildren[];
 }) {
+  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(child.name);
   const [icon, setIcon] = useState(child.icon);
@@ -639,6 +644,7 @@ function SubcategoryRow({
         formData.set("color", parentColor);
         await updateCategory(formData);
         setEditing(false);
+        router.refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to update");
         setName(child.name);
@@ -656,6 +662,7 @@ function SubcategoryRow({
         formData.set("id", String(child.id));
         formData.set("parentId", nextParentId);
         await updateCategoryParent(formData);
+        router.refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to move");
       }
@@ -663,7 +670,10 @@ function SubcategoryRow({
   }
 
   function handleDelete() {
-    if (!window.confirm(`Delete subcategory “${child.name}”?`)) return;
+    const ok = window.confirm(
+      `Delete subcategory “${child.name}”?\n\nExisting operations stay under “${parentName}”.`,
+    );
+    if (!ok) return;
     setError(null);
     startTransition(async () => {
       try {
@@ -672,7 +682,9 @@ function SubcategoryRow({
         const result = await deleteCategory(formData);
         if (result && "error" in result && result.error) {
           setError(result.error);
+          return;
         }
+        router.refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to delete");
       }
@@ -758,12 +770,14 @@ function SubcategoryRow({
           </Button>
           <Button
             type="button"
-            variant="ghost"
-            className="h-7 w-7 px-0 text-loss/70 hover:bg-loss/10 hover:text-loss"
+            variant="danger"
+            className="h-7 gap-1 px-2 text-xs"
             onClick={handleDelete}
-            aria-label={`Delete ${child.name}`}
+            disabled={pending}
+            aria-label={`Delete subcategory ${child.name}`}
           >
             <Trash2 className="h-3.5 w-3.5" />
+            Delete
           </Button>
         </div>
       )}

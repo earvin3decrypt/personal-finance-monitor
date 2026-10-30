@@ -26,3 +26,27 @@ export function isLoopbackAddress(value: string): boolean {
   if (LOOPBACK_HOSTS.has(trimmed)) return true;
   return LOOPBACK_HOSTS.has(hostnameFromHostHeader(trimmed));
 }
+
+/**
+ * The app is single-user with no auth, so public API routes only accept
+ * requests that look like they came from this machine.
+ */
+export function isLocalRequest(request: {
+  headers: { get(name: string): string | null };
+}): boolean {
+  if (!isLoopbackHostHeader(request.headers.get("host"))) return false;
+
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  if (
+    forwardedHost &&
+    !isLoopbackHostHeader(forwardedHost.split(",")[0] ?? "")
+  ) {
+    return false;
+  }
+
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded && !isLoopbackAddress(forwarded.split(",")[0] ?? "")) {
+    return false;
+  }
+  return true;
+}

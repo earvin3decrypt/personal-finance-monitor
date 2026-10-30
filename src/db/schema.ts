@@ -7,6 +7,24 @@ export const settings = sqliteTable("settings", {
     .notNull()
     .default("system"),
   blurAmounts: integer("blur_amounts").notNull().default(0),
+  /** Electron OS notifications + dock badge for due bills. */
+  billNotifications: integer("bill_notifications").notNull().default(1),
+  /** Optional AI category suggestions when no rule matches. */
+  aiCategorizationEnabled: integer("ai_categorization_enabled")
+    .notNull()
+    .default(0),
+  aiProvider: text("ai_provider", {
+    enum: ["ollama", "openai", "anthropic", "gemini"],
+  })
+    .notNull()
+    .default("ollama"),
+  aiModel: text("ai_model").notNull().default("llama3.2:3b"),
+  /** Stored locally; never exported in CSV. */
+  aiApiKey: text("ai_api_key"),
+  /** Must be a loopback URL when provider is ollama. */
+  aiOllamaBaseUrl: text("ai_ollama_base_url")
+    .notNull()
+    .default("http://127.0.0.1:11434"),
 });
 
 export const accounts = sqliteTable("accounts", {
@@ -202,6 +220,25 @@ export const fxRates = sqliteTable("fx_rates", {
   fetchedAt: text("fetched_at").notNull(),
 });
 
+export const categorizationRules = sqliteTable("categorization_rules", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  pattern: text("pattern").notNull(),
+  operator: text("operator", {
+    enum: ["contains", "starts_with", "exact"],
+  })
+    .notNull()
+    .default("contains"),
+  priority: integer("priority").notNull().default(0),
+  enabled: integer("enabled").notNull().default(1),
+  categoryId: integer("category_id")
+    .notNull()
+    .references(() => categories.id, { onDelete: "cascade" }),
+  subcategoryId: integer("subcategory_id").references(() => categories.id, {
+    onDelete: "cascade",
+  }),
+  createdAt: text("created_at").notNull(),
+});
+
 export const recurringItems = sqliteTable("recurring_items", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
@@ -242,3 +279,4 @@ export type CryptoHolding = typeof cryptoHoldings.$inferSelect;
 export type Dividend = typeof dividends.$inferSelect;
 export type PortfolioSnapshot = typeof portfolioSnapshots.$inferSelect;
 export type RecurringItem = typeof recurringItems.$inferSelect;
+export type CategorizationRule = typeof categorizationRules.$inferSelect;

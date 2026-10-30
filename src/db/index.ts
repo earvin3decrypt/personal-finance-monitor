@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import { runDailyBackupIfNeeded } from "@/lib/backups";
 import { resolveDatabasePath } from "@/lib/db-path";
 import { ensureDatabasePreserved } from "@/lib/db-preserve";
 import * as schema from "./schema";
@@ -347,6 +348,47 @@ function migrate(database: Database.Database) {
       "ALTER TABLE settings ADD COLUMN blur_amounts INTEGER NOT NULL DEFAULT 0",
     );
   }
+  if (!columnExists(database, "settings", "bill_notifications")) {
+    database.exec(
+      "ALTER TABLE settings ADD COLUMN bill_notifications INTEGER NOT NULL DEFAULT 1",
+    );
+  }
+  if (!columnExists(database, "settings", "ai_categorization_enabled")) {
+    database.exec(
+      "ALTER TABLE settings ADD COLUMN ai_categorization_enabled INTEGER NOT NULL DEFAULT 0",
+    );
+  }
+  if (!columnExists(database, "settings", "ai_provider")) {
+    database.exec(
+      "ALTER TABLE settings ADD COLUMN ai_provider TEXT NOT NULL DEFAULT 'ollama'",
+    );
+  }
+  if (!columnExists(database, "settings", "ai_model")) {
+    database.exec(
+      "ALTER TABLE settings ADD COLUMN ai_model TEXT NOT NULL DEFAULT 'llama3.2:3b'",
+    );
+  }
+  if (!columnExists(database, "settings", "ai_api_key")) {
+    database.exec("ALTER TABLE settings ADD COLUMN ai_api_key TEXT");
+  }
+  if (!columnExists(database, "settings", "ai_ollama_base_url")) {
+    database.exec(
+      "ALTER TABLE settings ADD COLUMN ai_ollama_base_url TEXT NOT NULL DEFAULT 'http://127.0.0.1:11434'",
+    );
+  }
+
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS categorization_rules (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pattern TEXT NOT NULL,
+      operator TEXT NOT NULL DEFAULT 'contains' CHECK(operator IN ('contains', 'starts_with', 'exact')),
+      priority INTEGER NOT NULL DEFAULT 0,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+      subcategory_id INTEGER REFERENCES categories(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL
+    );
+  `);
 
   migrateDividendsNullableHolding(database);
 
@@ -402,6 +444,15 @@ function initDatabase(): Db {
   sqlite.pragma("foreign_keys = ON");
   migrate(sqlite);
   dbInstance = drizzle(sqlite, { schema });
+
+  try {
+    const backup = runDailyBackupIfNeeded();
+    if (backup.created) {
+      console.info(`[db] ${backup.message}`);
+    }
+  } catch (err) {
+    console.error("[db] daily backup failed:", err);
+  }
 
   return dbInstance;
 }

@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
+import { isAllowedBackupSource } from "@/lib/backups";
 import {
   ensureDataDir,
   isAllowedDatabaseSource,
@@ -204,7 +205,10 @@ export function restoreDatabaseFromPath(
   canonicalPath: string,
   sourcePath: string,
 ): PreserveResult {
-  if (!isAllowedDatabaseSource(sourcePath)) {
+  if (
+    !isAllowedDatabaseSource(sourcePath) &&
+    !isAllowedBackupSource(sourcePath)
+  ) {
     return {
       restored: false,
       message: "That database location is not one of the app's known files.",

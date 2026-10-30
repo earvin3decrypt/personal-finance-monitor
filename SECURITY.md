@@ -8,12 +8,12 @@ Because there is no authentication, **do not expose the app to a network you don
 
 `npm run dev` and `npm start` listen on `127.0.0.1` only. Every request must use a loopback `Host` (`localhost`, `127.0.0.1`, or `::1`). That blocks a browser page on another site from reaching the app through DNS rebinding. Do not put the app behind a reverse proxy.
 
-The only network calls the app makes are:
+The only network calls the app makes by default are:
 
 - Yahoo Finance chart API — stock/ETF prices (ticker symbols only)
 - Frankfurter — currency exchange rates
 
-Nothing is sent to a remote host except ticker symbols and a currency code.
+If you enable optional AI categorization in Settings, the app may also call your chosen provider (Ollama on loopback, or OpenAI / Anthropic / Gemini). Those requests include the operation description/type and your category names only—not balances or account details. API keys are stored in the local SQLite database.
 
 ## Your data
 

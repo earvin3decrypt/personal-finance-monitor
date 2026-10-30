@@ -32,6 +32,15 @@ The database file is created automatically at `data/sqlite.db` on first run when
 
 Data lives in Application Support, not inside the app, so updating the `.dmg` does not delete it. On each launch the app picks the richest database if an older folder (e.g. `PersonalFinanceMonitor`) has more data. **Settings → Database** lists all locations and lets you restore from a backup copy.
 
+### Backups and export
+
+Daily SQLite backups are stored next to the active database in a `backups/` folder (`sqlite-YYYY-MM-DD.db`), kept for 30 days. The Mac app also refreshes the daily backup on a timer while running. From **Settings → Database** you can **Backup now**, **Restore** a dated backup, or **Download CSV export** (zip with operations, accounts, holdings, and bills).
+
+| How you run | Backups folder |
+|-------------|----------------|
+| `npm run dev` | `<project>/data/backups/` |
+| Mac `.app` | `~/Library/Application Support/personal-finance-monitor/data/backups/` |
+
 ## Pages
 
 | Route | Description |
@@ -41,7 +50,13 @@ Data lives in Application Support, not inside the app, so updating the `.dmg` do
 | `/expenses` | Log income/expenses with category picker, daily chart, category breakdown |
 | `/goals` | Category budgets with spending limits and savings goals with progress rings |
 | `/portfolio` | Holdings with live/cached prices and P/L |
-| `/settings` | Base currency, categories, manual refresh |
+| `/settings` | Base currency, categories, smart categorization, backups, CSV export |
+
+### Smart categorization
+
+In **Settings → Smart categorization** you can add description rules (for example, description contains `Leclerc` → Groceries). Rules are checked in order; the first match wins and selects the category automatically when you leave the note field on a new operation.
+
+Optional **AI suggestions** run only when no rule matches. Choose Ollama (local), OpenAI, Anthropic, or Gemini and set your preferred model. AI never applies a category by itself — you confirm with **Apply**. Remote providers receive only the operation description/type and your category names, not balances. API keys are stored in the local SQLite database (and therefore in database backups); they are not included in CSV exports.
 
 ## Daily snapshots
 
@@ -70,7 +85,7 @@ If you had a previous broken build, force-quit all **Personal Finance Monitor** 
 
 **Install:** open `dist-electron/Personal Finance Monitor-0.1.0-arm64.dmg`, drag to Applications, then right-click → **Open** the first time (unsigned app).
 
-The database is stored in `~/Library/Application Support/personal-finance-monitor/data/sqlite.db`.
+The database is stored in `~/Library/Application Support/personal-finance-monitor/data/sqlite.db`. Automatic backups live in the sibling `backups/` folder (see above).
 
 ## Offline behavior
 

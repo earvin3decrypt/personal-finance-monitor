@@ -241,10 +241,29 @@ export async function getBillAlerts(): Promise<BillAlerts> {
   return { count: alertBills.length, bills: alertBills };
 }
 
-/** Lightweight count for the nav badge — no FX conversion. */
-export function getBillAlertCount(): number {
+export type BillAlertStage = "due-soon" | "due-today" | "overdue";
+
+export type BillAlertItem = {
+  id: number;
+  name: string;
+  amount: number;
+  currency: string;
+  nextDueDate: string;
+  daysUntilDue: number;
+  stage: BillAlertStage;
+};
+
+/**
+ * Lightweight alert list for the nav badge and Electron notifications —
+ * no FX conversion.
+ */
+export function getBillAlertItems(): BillAlertItem[] {
   const rows = db
     .select({
+      id: recurringItems.id,
+      name: recurringItems.name,
+      amount: recurringItems.amount,
+      currency: recurringItems.currency,
       nextDueDate: recurringItems.nextDueDate,
       endDate: recurringItems.endDate,
       reminderDays: recurringItems.reminderDays,
@@ -253,15 +272,34 @@ export function getBillAlertCount(): number {
     .where(eq(recurringItems.isBill, 1))
     .all();
 
-  let count = 0;
+  const items: BillAlertItem[] = [];
   for (const row of rows) {
     if (isBillEnded(row.endDate, row.nextDueDate)) continue;
     if (!row.nextDueDate) continue;
     const days = daysFromToday(row.nextDueDate);
     const reminder = row.reminderDays ?? 3;
-    if (days < 0 || days <= reminder) count += 1;
+    if (!(days < 0 || days <= reminder)) continue;
+
+    let stage: BillAlertStage;
+    if (days < 0) stage = "overdue";
+    else if (days === 0) stage = "due-today";
+    else stage = "due-soon";
+
+    items.push({
+      id: row.id,
+      name: row.name,
+      amount: row.amount,
+      currency: row.currency,
+      nextDueDate: row.nextDueDate,
+      daysUntilDue: days,
+      stage,
+    });
   }
-  return count;
+  return items;
+}
+
+export function getBillAlertCount(): number {
+  return getBillAlertItems().length;
 }
 
 export function getTrackableRecurringItems(): TrackableRecurringItem[] {

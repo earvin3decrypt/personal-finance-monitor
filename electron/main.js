@@ -3,6 +3,11 @@ const { spawn } = require("child_process");
 const path = require("path");
 const net = require("net");
 const fs = require("fs");
+const {
+  startBillReminders,
+  stopBillReminders,
+} = require("./bill-reminders");
+const { startBackupTick, stopBackupTick } = require("./backup-tick");
 
 let port = 3456;
 let serverProcess = null;
@@ -234,6 +239,14 @@ function createWindow() {
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
+
+  startBillReminders({
+    getOrigin: appOrigin,
+    getWindow: () => mainWindow,
+  });
+  startBackupTick({
+    getOrigin: appOrigin,
+  });
 }
 
 if (gotLock) {
@@ -262,6 +275,8 @@ if (gotLock) {
   });
 
   app.on("before-quit", () => {
+    stopBillReminders();
+    stopBackupTick();
     if (serverProcess && !serverProcess.killed) {
       serverProcess.kill("SIGTERM");
     }

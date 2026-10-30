@@ -3,11 +3,15 @@
 import {
   useEffect,
   useId,
+  useRef,
   useState,
   useTransition,
 } from "react";
 import { Check, Plus, X } from "lucide-react";
-import { saveExpense } from "@/app/actions/expenses";
+import {
+  saveExpense,
+  suggestCategorization,
+} from "@/app/actions/expenses";
 import { AccountBrandIcon } from "@/components/account-brand-icon";
 import { CategoryIcon, resolveCategoryIcon } from "@/components/category-icon";
 import {
@@ -81,6 +85,14 @@ export function ExpenseEntry({
   const [selectedSubId, setSelectedSubId] = useState<number | null>(null);
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
   const [note, setNote] = useState("");
+  const [categoryLocked, setCategoryLocked] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<{
+    categoryId: number;
+    subcategoryId: number | null;
+    label: string;
+  } | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
+  const suggestSeq = useRef(0);
 
   useEffect(() => {
     const last = readLastUsed();
@@ -90,6 +102,42 @@ export function ExpenseEntry({
       setSelectedAccountId(last.accountId);
     }
   }, [categories, accounts]);
+
+  function applyCategory(
+    categoryId: number,
+    subcategoryId: number | null,
+    lock: boolean,
+  ) {
+    const cat = categories.find((c) => c.id === categoryId) ?? null;
+    if (!cat) return;
+    setSelectedCategory(cat);
+    setSelectedSubId(subcategoryId);
+    if (lock) setCategoryLocked(true);
+  }
+
+  async function evaluateDescription(value: string) {
+    const text = value.trim();
+    setAiSuggestion(null);
+    if (!text || categoryLocked) return;
+
+    const seq = ++suggestSeq.current;
+    setSuggesting(true);
+    try {
+      const result = await suggestCategorization(text, type);
+      if (seq !== suggestSeq.current) return;
+      if (result.kind === "rule") {
+        applyCategory(result.categoryId, result.subcategoryId, false);
+      } else if (result.kind === "ai") {
+        setAiSuggestion({
+          categoryId: result.categoryId,
+          subcategoryId: result.subcategoryId,
+          label: result.label,
+        });
+      }
+    } finally {
+      if (seq === suggestSeq.current) setSuggesting(false);
+    }
+  }
 
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId);
   const operationCurrency = selectedAccount?.currency ?? defaultCurrency;
@@ -128,6 +176,8 @@ export function ExpenseEntry({
       setAmountTouched(false);
       setNote("");
       setSelectedSubId(null);
+      setCategoryLocked(false);
+      setAiSuggestion(null);
       onSaved?.();
     });
   }
@@ -319,6 +369,8 @@ export function ExpenseEntry({
                       onClick={() => {
                         setSelectedCategory(cat);
                         setSelectedSubId(null);
+                        setCategoryLocked(true);
+                        setAiSuggestion(null);
                         setOpenPicker(null);
                       }}
                       className={cn(
@@ -357,7 +409,11 @@ export function ExpenseEntry({
                   key={sub.id}
                   type="button"
                   aria-pressed={selected}
-                  onClick={() => setSelectedSubId(selected ? null : sub.id)}
+                  onClick={() => {
+                    setSelectedSubId(selected ? null : sub.id);
+                    setCategoryLocked(true);
+                    setAiSuggestion(null);
+                  }}
                   className={cn(
                     "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/10",
                     selected
@@ -392,8 +448,42 @@ export function ExpenseEntry({
             type="text"
             value={note}
             onChange={(e) => setNote(e.target.value)}
+            onBlur={() => void evaluateDescription(note)}
             placeholder="Merchant or detail"
           />
+          {suggesting && (
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Checking category…
+            </p>
+          )}
+          {aiSuggestion && !categoryLocked && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-muted-foreground">
+                Suggested: {aiSuggestion.label}
+              </span>
+              <button
+                type="button"
+                className="font-medium text-primary hover:underline"
+                onClick={() => {
+                  applyCategory(
+                    aiSuggestion.categoryId,
+                    aiSuggestion.subcategoryId,
+                    true,
+                  );
+                  setAiSuggestion(null);
+                }}
+              >
+                Apply
+              </button>
+              <button
+                type="button"
+                className="font-medium text-muted-foreground hover:underline"
+                onClick={() => setAiSuggestion(null)}
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

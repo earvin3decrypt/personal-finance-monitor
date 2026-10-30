@@ -4,11 +4,56 @@ import { db } from "@/db";
 import { accounts, expenses } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { suggestCategoryWithAi } from "@/lib/ai-categorization";
+import { matchCategorizationRule } from "@/lib/categorization";
 import { isSupportedCurrency } from "@/lib/currencies";
 import { searchExpenses } from "@/lib/expense-stats";
 
 export async function searchExpensesAction(query: string) {
   return searchExpenses(query);
+}
+
+export type SuggestCategorizationResult =
+  | {
+      kind: "rule";
+      categoryId: number;
+      subcategoryId: number | null;
+    }
+  | {
+      kind: "ai";
+      categoryId: number;
+      subcategoryId: number | null;
+      label: string;
+    }
+  | { kind: "none" };
+
+export async function suggestCategorization(
+  description: string,
+  type: "expense" | "income",
+): Promise<SuggestCategorizationResult> {
+  const text = description.trim();
+  if (!text) return { kind: "none" };
+
+  const rule = matchCategorizationRule(text);
+  if (rule) {
+    return {
+      kind: "rule",
+      categoryId: rule.categoryId,
+      subcategoryId: rule.subcategoryId,
+    };
+  }
+
+  const ai = await suggestCategoryWithAi(text, type);
+  if (ai) {
+    return {
+      kind: "ai",
+      categoryId: ai.categoryId,
+      subcategoryId: ai.subcategoryId,
+      label: ai.label,
+    };
+  }
+
+  return { kind: "none" };
 }
 
 export async function saveExpense(formData: FormData) {

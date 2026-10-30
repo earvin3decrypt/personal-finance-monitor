@@ -32,7 +32,7 @@ import { CategoryIcon } from "@/components/category-icon";
 import { DashboardGoals } from "@/components/dashboard-goals";
 import { DashboardMonthlyBudget } from "@/components/dashboard-monthly-budget";
 import { DashboardRefreshButton } from "@/components/dashboard-refresh-button";
-import { UpcomingBillsCard } from "@/components/upcoming-bills-card";
+import { BillAlertsBell } from "@/components/bill-alerts-bell";
 import { Money } from "@/components/money";
 import { getBillAlerts } from "@/lib/bills";
 
@@ -156,15 +156,18 @@ export default async function DashboardPage() {
       <PageHeader
         title="Dashboard"
         description="Your net worth and recent activity"
-        action={<DashboardRefreshButton />}
+        action={
+          <div className="flex items-center gap-2">
+            <BillAlertsBell bills={billAlerts.bills} />
+            <DashboardRefreshButton />
+          </div>
+        }
       />
       <OfflineBanner
         fxStale={summary.fxStale}
         pricesStale={summary.pricesStale}
         refreshAction={<DashboardRefreshButton />}
       />
-
-      <UpcomingBillsCard bills={billAlerts.bills} />
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
