@@ -7,6 +7,7 @@ import {
   useState,
   useTransition,
 } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Check, Plus, X } from "lucide-react";
 import {
   saveExpense,
@@ -37,7 +38,16 @@ export function NewOperationButton(props: {
   defaultCurrency: string;
   defaultDate: string;
 }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("new") !== "1") return;
+    setOpen(true);
+    router.replace("/expenses", { scroll: false });
+  }, [searchParams, router]);
+
   return (
     <>
       <Button type="button" onClick={() => setOpen(true)}>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { BlurAmountsToggle } from "@/components/blur-amounts-toggle";
+import { CommandPalette } from "@/components/command-palette";
 import { Nav } from "@/components/nav";
 import { PrivacyProvider } from "@/components/privacy-provider";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -68,6 +69,7 @@ export default function RootLayout({
                 <main className="flex-1 p-5 md:p-8">{children}</main>
               </div>
             </div>
+            <CommandPalette />
           </PrivacyProvider>
         </ThemeProvider>
       </body>

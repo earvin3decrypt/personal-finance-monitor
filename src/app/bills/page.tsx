@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { unstable_noStore as noStore } from "next/cache";
 import { db } from "@/db";
 import { accounts } from "@/db/schema";
@@ -29,16 +30,18 @@ export default async function BillsPage() {
     }));
 
   return (
-    <div className="mx-auto max-w-6xl">
-      <BillsView
-        baseCurrency={baseCurrency}
-        bills={bills}
-        monthlyTotalBase={monthlyTotalBase}
-        dueInSevenDays={dueInSevenDays}
-        trackable={trackable}
-        accounts={accountOptions}
-        categories={categories}
-      />
+    <div>
+      <Suspense fallback={null}>
+        <BillsView
+          baseCurrency={baseCurrency}
+          bills={bills}
+          monthlyTotalBase={monthlyTotalBase}
+          dueInSevenDays={dueInSevenDays}
+          trackable={trackable}
+          accounts={accountOptions}
+          categories={categories}
+        />
+      </Suspense>
     </div>
   );
 }

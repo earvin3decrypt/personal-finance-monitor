@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, useMemo, useState, useTransition } from "react";
+import { useEffect, useId, useMemo, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   CalendarClock,
@@ -78,6 +79,8 @@ export function BillsView({
   accounts,
   categories,
 }: BillsViewProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [editing, setEditing] = useState<BillRow | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [trackingId, setTrackingId] = useState<number | null>(null);
@@ -87,6 +90,13 @@ export function BillsView({
   const upcoming = bills.filter((b) => b.status === "upcoming");
   const ended = bills.filter((b) => b.status === "ended");
   const activeCount = bills.length - ended.length;
+
+  useEffect(() => {
+    if (searchParams.get("new") !== "1") return;
+    setEditing(null);
+    setFormOpen(true);
+    router.replace("/bills", { scroll: false });
+  }, [searchParams, router]);
 
   function openAdd() {
     setEditing(null);
@@ -190,8 +200,7 @@ export function BillsView({
             <div>
               <p className="font-medium">No bills tracked yet</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Add a subscription or bill with Add bill, or promote an existing
-                recurring expense from Forecast.
+                Add a subscription or bill with Add bill.
               </p>
             </div>
           </div>
@@ -202,8 +211,7 @@ export function BillsView({
         <Card>
           <h2 className="mb-1 text-sm font-semibold">Track as bill</h2>
           <p className="mb-4 text-sm text-muted-foreground">
-            These recurring expenses from Forecast are not yet tracked with due
-            dates.
+            These recurring expenses are not yet tracked with due dates.
           </p>
           <ul className="divide-y divide-border">
             {trackable.map((item) => (

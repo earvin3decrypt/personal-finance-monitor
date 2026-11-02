@@ -10,7 +10,6 @@ import { todayISO } from "@/lib/format";
 
 function revalidateBillPaths() {
   revalidatePath("/bills");
-  revalidatePath("/forecast");
   revalidatePath("/expenses");
   revalidatePath("/accounts");
   revalidatePath("/");

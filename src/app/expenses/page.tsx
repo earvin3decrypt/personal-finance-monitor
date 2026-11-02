@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { db } from "@/db";
 import { accounts } from "@/db/schema";
@@ -107,7 +108,7 @@ export default async function ExpensesPage({
   const scope = isCurrentMonth ? "this month" : `in ${monthLabel.split(" ")[0]}`;
 
   return (
-    <div className="mx-auto max-w-6xl pb-20">
+    <div className="pb-20">
       <ExpenseFilterProvider>
         <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -141,12 +142,14 @@ export default async function ExpensesPage({
                 Today
               </Link>
             )}
-            <NewOperationButton
-              categories={categories}
-              accounts={accountOptions}
-              defaultCurrency={baseCurrency}
-              defaultDate={today}
-            />
+            <Suspense fallback={null}>
+              <NewOperationButton
+                categories={categories}
+                accounts={accountOptions}
+                defaultCurrency={baseCurrency}
+                defaultDate={today}
+              />
+            </Suspense>
           </div>
         </header>
 

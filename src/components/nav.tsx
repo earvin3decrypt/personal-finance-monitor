@@ -19,13 +19,14 @@ import {
   PiggyBank,
   Coins,
   PieChart,
-  TrendingUp,
   CalendarClock,
+  Search,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BlurAmountsToggle } from "@/components/blur-amounts-toggle";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { openCommandPalette } from "@/lib/command-palette";
 
 type NavItem = {
   href: string;
@@ -43,10 +44,7 @@ function buildGroups(billAlertCount: number): NavGroup[] {
   return [
     {
       label: "Overview",
-      items: [
-        { href: "/", label: "Dashboard", icon: LayoutDashboard },
-        { href: "/forecast", label: "Forecast", icon: TrendingUp },
-      ],
+      items: [{ href: "/", label: "Dashboard", icon: LayoutDashboard }],
     },
     {
       label: "Money",
@@ -181,9 +179,23 @@ function SidebarNav({ billAlertCount }: { billAlertCount: number }) {
           ))}
         </div>
 
-        <div className="flex items-center justify-center gap-1.5 px-3 pb-4 [-webkit-app-region:no-drag]">
-          <ThemeToggle compact />
-          <BlurAmountsToggle compact />
+        <div className="flex flex-col gap-2 px-3 pb-4 [-webkit-app-region:no-drag]">
+          <button
+            type="button"
+            onClick={() => openCommandPalette()}
+            className="flex w-full items-center gap-2 rounded-[10px] border border-border bg-card px-2.5 py-2 text-left text-[12px] text-muted-foreground transition hover:bg-muted hover:text-foreground [border-width:0.5px]"
+            aria-label="Open search"
+          >
+            <Search className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span className="min-w-0 flex-1 truncate">Search…</span>
+            <kbd className="rounded border border-border px-1 py-0.5 text-[10px] text-muted-foreground">
+              ⌘K
+            </kbd>
+          </button>
+          <div className="flex items-center justify-center gap-1.5">
+            <ThemeToggle compact />
+            <BlurAmountsToggle compact />
+          </div>
         </div>
       </motion.nav>
     </MotionConfig>
