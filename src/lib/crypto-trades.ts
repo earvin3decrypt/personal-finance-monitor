@@ -20,6 +20,7 @@ export function formatTradeQty(qty: number): string {
 
 export type CryptoTradeRow = {
   id: number;
+  source: "operation" | "opening";
   side: "buy" | "sell";
   symbol: string;
   quantity: string | null;

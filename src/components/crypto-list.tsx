@@ -3,11 +3,14 @@
 import { Pencil } from "lucide-react";
 import { CryptoIcon } from "@/components/crypto-icon";
 import type { CryptoWithMetrics } from "@/lib/portfolio";
-import { formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import { Button, PlValue } from "@/components/ui";
 import { Money } from "@/components/money";
 
-export type CryptoRow = CryptoWithMetrics & { updatedAt?: string };
+export type CryptoRow = CryptoWithMetrics & {
+  updatedAt?: string;
+  firstPurchaseDate?: string;
+};
 
 export function CryptoList({
   holdings,
@@ -73,6 +76,9 @@ export function CryptoList({
                   </Money>
                 ) : (
                   "· price unavailable"
+                )}
+                {h.firstPurchaseDate && (
+                  <span> · Since {formatDate(h.firstPurchaseDate)}</span>
                 )}
               </p>
               {totalBase > 0 && h.marketValueBase != null && (

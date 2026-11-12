@@ -1,16 +1,20 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import { deleteHoldingTrade } from "@/app/actions/holding-trades";
+import {
+  deleteHoldingTrade,
+  setHoldingPurchaseDate,
+  updateHoldingTradeDate,
+} from "@/app/actions/holding-trades";
 import {
   buildHoldingTradeSummary,
   lotMetrics,
   type HoldingTradeRow,
 } from "@/lib/holding-trade-metrics";
 import type { HoldingWithMetrics } from "@/lib/portfolio";
-import { formatDate } from "@/lib/format";
-import { Button, Card, PlValue } from "@/components/ui";
+import { todayISO } from "@/lib/format";
+import { Button, Card, Input, Label, PlValue } from "@/components/ui";
 import { HoldingTradeModal } from "@/components/holding-trade-modal";
 import { Money } from "@/components/money";
 
@@ -26,6 +30,7 @@ export function HoldingDetailPanel({
   accounts: AccountOption[];
 }) {
   const [tradeOpen, setTradeOpen] = useState(false);
+  const [pendingDate, startDateTransition] = useTransition();
   const price = holding.currentPrice;
   const summary = buildHoldingTradeSummary(
     trades,
@@ -33,6 +38,17 @@ export function HoldingDetailPanel({
     holding.costBasis,
     price,
   );
+  const firstBuyDate =
+    trades
+      .filter((t) => t.side === "buy")
+      .map((t) => t.date)
+      .sort()[0] ?? todayISO();
+
+  function handlePurchaseDate(formData: FormData) {
+    startDateTransition(async () => {
+      await setHoldingPurchaseDate(formData);
+    });
+  }
 
   return (
     <Card className="mt-4 border-primary/20 bg-muted/20">
@@ -46,6 +62,29 @@ export function HoldingDetailPanel({
           Record buy
         </Button>
       </div>
+
+      <form
+        action={handlePurchaseDate}
+        className="mb-6 flex flex-wrap items-end gap-3 rounded-lg border border-border/60 bg-card px-3 py-3"
+      >
+        <input type="hidden" name="holdingId" value={holding.id} />
+        <div className="min-w-[10rem] flex-1">
+          <Label htmlFor={`holding-purchase-${holding.id}`}>
+            First purchase date
+          </Label>
+          <Input
+            key={`purchase-${holding.id}-${firstBuyDate}`}
+            id={`holding-purchase-${holding.id}`}
+            name="date"
+            type="date"
+            defaultValue={firstBuyDate}
+            required
+          />
+        </div>
+        <Button type="submit" variant="secondary" disabled={pendingDate}>
+          {pendingDate ? "Saving…" : "Save date"}
+        </Button>
+      </form>
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <SummaryStat
@@ -98,8 +137,8 @@ export function HoldingDetailPanel({
 
       {trades.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No trades recorded. Add buy history or use the form above to record
-          future purchases.
+          No trades recorded yet. Set a first purchase date above, or record a
+          buy for future purchases.
         </p>
       ) : (
         <div className="overflow-x-auto">
@@ -121,8 +160,18 @@ export function HoldingDetailPanel({
                 const metrics = lotMetrics(trade, price);
                 return (
                   <tr key={trade.id} className="border-b border-border/60">
-                    <td className="py-2.5 pr-4 tabular-nums">
-                      {formatDate(trade.date)}
+                    <td className="py-2.5 pr-4">
+                      <form action={updateHoldingTradeDate} className="flex">
+                        <input type="hidden" name="id" value={trade.id} />
+                        <Input
+                          name="date"
+                          type="date"
+                          defaultValue={trade.date}
+                          className="h-8 w-[9.5rem] px-2 text-xs"
+                          onChange={(e) => e.currentTarget.form?.requestSubmit()}
+                          aria-label="Trade date"
+                        />
+                      </form>
                     </td>
                     <td className="py-2.5 pr-4 capitalize">{trade.side}</td>
                     <td className="py-2.5 pr-4 text-right tabular-nums">

@@ -606,7 +606,7 @@ function DonutCenterLabel({
         className="fill-muted-foreground"
         style={{ fontSize: "0.75rem", fill: mutedFill }}
       >
-        Total assets
+        Total
       </tspan>
     </text>
   );

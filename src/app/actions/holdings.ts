@@ -1,10 +1,13 @@
 "use server";
 
 import { db } from "@/db";
-import { holdings } from "@/db/schema";
+import { holdings, holdingTrades } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { isSupportedCurrency } from "@/lib/currencies";
+import { todayISO } from "@/lib/format";
+import { syncHoldingFromTrades } from "@/lib/holding-trades";
+import { recordPortfolioSnapshot } from "@/lib/snapshot";
 
 export async function saveHolding(formData: FormData) {
   const id = formData.get("id");
@@ -14,6 +17,7 @@ export async function saveHolding(formData: FormData) {
   const quantity = Number(formData.get("quantity"));
   const costBasis = Number(formData.get("costBasis"));
   const currency = String(formData.get("currency") ?? "USD");
+  const date = String(formData.get("date") ?? "").trim() || todayISO();
   const accountIdRaw = formData.get("accountId");
   const accountId =
     accountIdRaw && String(accountIdRaw) !== ""
@@ -42,7 +46,25 @@ export async function saveHolding(formData: FormData) {
       .where(eq(holdings.id, Number(id)))
       .run();
   } else {
-    db.insert(holdings).values(values).run();
+    const result = db.insert(holdings).values(values).run();
+    const holdingId = Number(result.lastInsertRowid);
+
+    db.insert(holdingTrades)
+      .values({
+        holdingId,
+        side: "buy",
+        quantity,
+        unitPrice: costBasis,
+        totalAmount: quantity * costBasis,
+        currency,
+        date,
+        accountId,
+        createdAt: new Date().toISOString(),
+      })
+      .run();
+
+    syncHoldingFromTrades(holdingId);
+    await recordPortfolioSnapshot();
   }
 
   revalidatePath("/portfolio");

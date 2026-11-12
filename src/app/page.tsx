@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
-import { ChevronRight } from "lucide-react";
+import { Bell, ChevronRight } from "lucide-react";
 import { db } from "@/db";
 import { categories, expenses, accounts } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";

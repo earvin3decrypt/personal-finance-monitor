@@ -1,15 +1,112 @@
 "use server";
 
 import { db } from "@/db";
-import { cryptoHoldings, expenses } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import {
+  categories,
+  cryptoHoldings,
+  cryptoTrades,
+  expenses,
+} from "@/db/schema";
+import { and, asc, eq, isNull, like } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { ensureCryptoCategory } from "@/lib/categories";
 import { cryptoDisplayName } from "@/lib/crypto-symbols";
-import { formatTradeQty, weightedAverageCost } from "@/lib/crypto-trades";
+import {
+  formatTradeQty,
+  parseCryptoTradeDescription,
+  weightedAverageCost,
+} from "@/lib/crypto-trades";
 import { isSupportedCurrency } from "@/lib/currencies";
 import { todayISO } from "@/lib/format";
 import { recordPortfolioSnapshot } from "@/lib/snapshot";
+
+/**
+ * Set the first purchase date for a crypto position:
+ * update opening trade if present, else earliest Buy expense, else create opening.
+ */
+function setCryptoFirstPurchaseDate(params: {
+  symbol: string;
+  quantity: number;
+  costBasis: number | null;
+  currency: string;
+  date: string;
+  createdAt: string;
+  /** When false, only update existing history — never invent an opening lot. */
+  allowCreateOpening: boolean;
+}) {
+  const opening = db
+    .select()
+    .from(cryptoTrades)
+    .where(eq(cryptoTrades.symbol, params.symbol))
+    .orderBy(asc(cryptoTrades.date), asc(cryptoTrades.id))
+    .limit(1)
+    .all()[0];
+
+  if (opening) {
+    db.update(cryptoTrades)
+      .set({ date: params.date })
+      .where(eq(cryptoTrades.id, opening.id))
+      .run();
+    return;
+  }
+
+  const cryptoCategory = db
+    .select({ id: categories.id })
+    .from(categories)
+    .where(and(isNull(categories.parentId), eq(categories.name, "Crypto")))
+    .limit(1)
+    .all()[0];
+
+  if (cryptoCategory) {
+    const expenseBuys = db
+      .select({
+        id: expenses.id,
+        date: expenses.date,
+        description: expenses.description,
+      })
+      .from(expenses)
+      .where(
+        and(
+          eq(expenses.categoryId, cryptoCategory.id),
+          like(expenses.description, `Buy % ${params.symbol}`),
+        ),
+      )
+      .orderBy(asc(expenses.date), asc(expenses.id))
+      .all();
+
+    const earliestExpenseBuy = expenseBuys.find((row) => {
+      const parsed = parseCryptoTradeDescription(row.description);
+      return (
+        parsed?.side === "buy" &&
+        parsed.symbol === params.symbol
+      );
+    });
+
+    if (earliestExpenseBuy) {
+      db.update(expenses)
+        .set({ date: params.date })
+        .where(eq(expenses.id, earliestExpenseBuy.id))
+        .run();
+      return;
+    }
+  }
+
+  if (!params.allowCreateOpening) return;
+
+  const unitPrice = params.costBasis ?? 0;
+  db.insert(cryptoTrades)
+    .values({
+      symbol: params.symbol,
+      side: "buy",
+      quantity: params.quantity,
+      unitPrice,
+      totalAmount: params.quantity * unitPrice,
+      currency: params.currency,
+      date: params.date,
+      createdAt: params.createdAt,
+    })
+    .run();
+}
 
 function revalidateCryptoPaths() {
   revalidatePath("/crypto");
@@ -58,6 +155,7 @@ export async function saveCryptoHolding(formData: FormData) {
       ? Number(costBasisRaw)
       : null;
   const currency = String(formData.get("currency") ?? "USD");
+  const date = String(formData.get("date") ?? "").trim() || todayISO();
 
   if (!symbol) throw new Error("Symbol required");
   if (!name) name = cryptoDisplayName(symbol);
@@ -67,6 +165,13 @@ export async function saveCryptoHolding(formData: FormData) {
   const updatedAt = new Date().toISOString();
 
   if (id) {
+    const existing = db
+      .select()
+      .from(cryptoHoldings)
+      .where(eq(cryptoHoldings.id, Number(id)))
+      .limit(1)
+      .all()[0];
+
     db.update(cryptoHoldings)
       .set({
         symbol,
@@ -78,6 +183,23 @@ export async function saveCryptoHolding(formData: FormData) {
       })
       .where(eq(cryptoHoldings.id, Number(id)))
       .run();
+
+    if (existing && existing.symbol !== symbol) {
+      db.update(cryptoTrades)
+        .set({ symbol })
+        .where(eq(cryptoTrades.symbol, existing.symbol))
+        .run();
+    }
+
+    setCryptoFirstPurchaseDate({
+      symbol,
+      quantity,
+      costBasis,
+      currency,
+      date,
+      createdAt: updatedAt,
+      allowCreateOpening: true,
+    });
   } else {
     db.insert(cryptoHoldings)
       .values({
@@ -89,6 +211,16 @@ export async function saveCryptoHolding(formData: FormData) {
         updatedAt,
       })
       .run();
+
+    setCryptoFirstPurchaseDate({
+      symbol,
+      quantity,
+      costBasis,
+      currency,
+      date,
+      createdAt: updatedAt,
+      allowCreateOpening: true,
+    });
   }
 
   await recordPortfolioSnapshot();
@@ -97,6 +229,18 @@ export async function saveCryptoHolding(formData: FormData) {
 
 export async function deleteCryptoHolding(formData: FormData) {
   const id = Number(formData.get("id"));
+  const holding = db
+    .select({ symbol: cryptoHoldings.symbol })
+    .from(cryptoHoldings)
+    .where(eq(cryptoHoldings.id, id))
+    .limit(1)
+    .all()[0];
+
+  if (holding) {
+    db.delete(cryptoTrades)
+      .where(eq(cryptoTrades.symbol, holding.symbol))
+      .run();
+  }
   db.delete(cryptoHoldings).where(eq(cryptoHoldings.id, id)).run();
   await recordPortfolioSnapshot();
   revalidateCryptoPaths();

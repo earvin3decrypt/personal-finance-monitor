@@ -8,6 +8,7 @@ import {
 } from "@/app/actions/crypto";
 import { lookupCrypto, POPULAR_CRYPTO } from "@/lib/crypto-symbols";
 import { SUPPORTED_CURRENCIES } from "@/lib/currencies";
+import { todayISO } from "@/lib/format";
 import { Button, Input, Label, Modal, Select } from "@/components/ui";
 import type { CryptoRow } from "@/components/crypto-list";
 
@@ -194,6 +195,24 @@ export function CryptoEditModal({
               className="pl-12"
             />
           </div>
+        </div>
+
+        <div>
+          <Label htmlFor="crypto-purchase-date">Purchase date</Label>
+          <Input
+            key={`purchase-date-${holding?.id ?? "new"}-${holding?.firstPurchaseDate ?? "none"}`}
+            id="crypto-purchase-date"
+            name="date"
+            type="date"
+            defaultValue={holding?.firstPurchaseDate ?? todayISO()}
+            required
+          />
+          {isEditing && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Sets when this position was first purchased. Used for “Since” on
+              the holdings list.
+            </p>
+          )}
         </div>
       </form>
     </Modal>

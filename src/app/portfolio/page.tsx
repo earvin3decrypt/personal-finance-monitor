@@ -163,6 +163,16 @@ export default async function PortfolioPage() {
               ))}
             </Select>
           </div>
+          <div>
+            <Label htmlFor="purchaseDate">Purchase date</Label>
+            <Input
+              id="purchaseDate"
+              name="date"
+              type="date"
+              defaultValue={todayISO()}
+              required
+            />
+          </div>
           <div className="flex items-end">
             <Button type="submit">Add holding</Button>
           </div>

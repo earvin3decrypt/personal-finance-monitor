@@ -407,6 +407,20 @@ function migrate(database: Database.Database) {
     );
   `);
 
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS crypto_trades (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      symbol TEXT NOT NULL,
+      side TEXT NOT NULL CHECK(side IN ('buy')) DEFAULT 'buy',
+      quantity REAL NOT NULL,
+      unit_price REAL NOT NULL,
+      total_amount REAL NOT NULL,
+      currency TEXT NOT NULL,
+      date TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+  `);
+
   const settingsCount = database
     .prepare("SELECT COUNT(*) as c FROM settings")
     .get() as { c: number };

@@ -3,7 +3,10 @@ import { unstable_noStore as noStore } from "next/cache";
 import { db } from "@/db";
 import { accounts, cryptoHoldings } from "@/db/schema";
 import { getPortfolioSummary } from "@/lib/portfolio";
-import { getCryptoTradeHistory } from "@/lib/crypto-history";
+import {
+  getCryptoFirstPurchaseDates,
+  getCryptoTradeHistory,
+} from "@/lib/crypto-history";
 import { getPortfolioHistory, ensureTodaySnapshot } from "@/lib/snapshot";
 import { buildCryptoChartData } from "@/lib/chart-data";
 import { formatMoney, todayISO } from "@/lib/format";
@@ -28,10 +31,12 @@ export default async function CryptoPage() {
 
   const rows = db.select().from(cryptoHoldings).all();
   const updatedAtById = new Map(rows.map((r) => [r.id, r.updatedAt]));
+  const firstPurchaseBySymbol = getCryptoFirstPurchaseDates();
 
   const holdings = summary.crypto.map((c) => ({
     ...c,
     updatedAt: updatedAtById.get(c.id),
+    firstPurchaseDate: firstPurchaseBySymbol.get(c.symbol.toUpperCase()),
   }));
 
   const accountOptions = db

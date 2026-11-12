@@ -33,7 +33,7 @@ export function CryptoTradeHistory({ trades }: { trades: CryptoTradeRow[] }) {
         <ul className="divide-y divide-border">
           {trades.map((trade) => (
             <li
-              key={trade.id}
+              key={`${trade.source}-${trade.id}`}
               className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
             >
               <div className="min-w-0">

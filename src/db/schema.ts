@@ -212,6 +212,19 @@ export const cryptoHoldings = sqliteTable("crypto_holdings", {
   updatedAt: text("updated_at").notNull(),
 });
 
+/** Opening buys for positions added without an account-linked trade. */
+export const cryptoTrades = sqliteTable("crypto_trades", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  symbol: text("symbol").notNull(),
+  side: text("side", { enum: ["buy"] }).notNull().default("buy"),
+  quantity: real("quantity").notNull(),
+  unitPrice: real("unit_price").notNull(),
+  totalAmount: real("total_amount").notNull(),
+  currency: text("currency").notNull(),
+  date: text("date").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
 export const fxRates = sqliteTable("fx_rates", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   base: text("base").notNull(),

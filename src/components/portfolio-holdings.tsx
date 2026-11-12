@@ -7,6 +7,7 @@ import type { HoldingWithMetrics } from "@/lib/portfolio";
 import { Button, PlValue } from "@/components/ui";
 import { HoldingDetailPanel } from "@/components/holding-detail-panel";
 import { Money } from "@/components/money";
+import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type AccountOption = { id: number; name: string; currency: string };
@@ -60,7 +61,12 @@ export function PortfolioHoldingsTable({
           </thead>
           <tbody>
             {holdings.map((h) => {
-              const hasTrades = (tradesByHolding[h.id]?.length ?? 0) > 0;
+              const trades = tradesByHolding[h.id] ?? [];
+              const hasTrades = trades.length > 0;
+              const firstBuyDate = trades
+                .filter((t) => t.side === "buy")
+                .map((t) => t.date)
+                .sort()[0];
               const isSelected = selectedId === h.id;
               return (
                 <tr
@@ -79,9 +85,14 @@ export function PortfolioHoldingsTable({
                     <p className="font-medium">{h.symbol}</p>
                     <p className="text-xs text-muted-foreground">
                       {h.name}
+                      {firstBuyDate && (
+                        <span className="ml-1.5">
+                          · Since {formatDate(firstBuyDate)}
+                        </span>
+                      )}
                       {hasTrades && (
                         <span className="ml-1.5 text-primary">
-                          · {tradesByHolding[h.id].length} trades
+                          · {trades.length} trades
                         </span>
                       )}
                     </p>
