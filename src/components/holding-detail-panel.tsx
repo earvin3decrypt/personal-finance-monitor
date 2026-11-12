@@ -2,6 +2,7 @@
 
 import { useState, useTransition, type ReactNode } from "react";
 import { Plus, Trash2 } from "lucide-react";
+import { deleteHolding } from "@/app/actions/holdings";
 import {
   deleteHoldingTrade,
   setHoldingPurchaseDate,
@@ -14,7 +15,7 @@ import {
 } from "@/lib/holding-trade-metrics";
 import type { HoldingWithMetrics } from "@/lib/portfolio";
 import { todayISO } from "@/lib/format";
-import { Button, Card, Input, Label, PlValue } from "@/components/ui";
+import { Button, Input, Label, PlValue } from "@/components/ui";
 import { HoldingTradeModal } from "@/components/holding-trade-modal";
 import { Money } from "@/components/money";
 
@@ -31,6 +32,7 @@ export function HoldingDetailPanel({
 }) {
   const [tradeOpen, setTradeOpen] = useState(false);
   const [pendingDate, startDateTransition] = useTransition();
+  const [pendingDelete, startDeleteTransition] = useTransition();
   const price = holding.currentPrice;
   const summary = buildHoldingTradeSummary(
     trades,
@@ -50,48 +52,86 @@ export function HoldingDetailPanel({
     });
   }
 
+  function handleDeleteHolding(formData: FormData) {
+    if (
+      !confirm(
+        `Delete holding “${holding.symbol}”? This also removes its trade history.`,
+      )
+    ) {
+      return;
+    }
+    startDeleteTransition(async () => {
+      await deleteHolding(formData);
+    });
+  }
+
   return (
-    <Card className="mt-4 border-primary/20 bg-muted/20">
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="font-semibold">{holding.symbol}</h3>
-          <p className="text-sm text-muted-foreground">{holding.name}</p>
+    <div
+      className="rounded-xl bg-muted/20 px-4 py-4"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <form
+          action={handlePurchaseDate}
+          className="flex flex-wrap items-end gap-2"
+        >
+          <input type="hidden" name="holdingId" value={holding.id} />
+          <div className="min-w-[10rem]">
+            <Label htmlFor={`holding-purchase-${holding.id}`}>
+              First purchase
+            </Label>
+            <Input
+              key={`purchase-${holding.id}-${firstBuyDate}`}
+              id={`holding-purchase-${holding.id}`}
+              name="date"
+              type="date"
+              defaultValue={firstBuyDate}
+              required
+              className="h-9"
+            />
+          </div>
+          <Button
+            type="submit"
+            variant="secondary"
+            className="h-9"
+            disabled={pendingDate}
+          >
+            {pendingDate ? "Saving…" : "Save"}
+          </Button>
+        </form>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" className="h-9" onClick={() => setTradeOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Record buy
+          </Button>
+          <form action={handleDeleteHolding}>
+            <input type="hidden" name="id" value={holding.id} />
+            <button
+              type="submit"
+              disabled={pendingDelete}
+              className="rounded-md px-2 py-1.5 text-xs font-medium text-loss/80 transition hover:text-loss disabled:opacity-50"
+            >
+              Delete holding
+            </button>
+          </form>
         </div>
-        <Button type="button" onClick={() => setTradeOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Record buy
-        </Button>
       </div>
 
-      <form
-        action={handlePurchaseDate}
-        className="mb-6 flex flex-wrap items-end gap-3 rounded-lg border border-border/60 bg-card px-3 py-3"
-      >
-        <input type="hidden" name="holdingId" value={holding.id} />
-        <div className="min-w-[10rem] flex-1">
-          <Label htmlFor={`holding-purchase-${holding.id}`}>
-            First purchase date
-          </Label>
-          <Input
-            key={`purchase-${holding.id}-${firstBuyDate}`}
-            id={`holding-purchase-${holding.id}`}
-            name="date"
-            type="date"
-            defaultValue={firstBuyDate}
-            required
-          />
-        </div>
-        <Button type="submit" variant="secondary" disabled={pendingDate}>
-          {pendingDate ? "Saving…" : "Save date"}
-        </Button>
-      </form>
-
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <SummaryStat
-          label="Shares"
-          value={String(summary.shares)}
+      <div className="mb-4 flex flex-wrap divide-x divide-border/70 rounded-lg border border-border/60 bg-card/60">
+        <CompactStat
+          label="Total cost"
+          value={
+            <Money amount={summary.totalCost} currency={holding.currency} />
+          }
         />
-        <SummaryStat
+        <CompactStat
+          label="Avg purchase"
+          value={
+            <Money amount={summary.avgCost} currency={holding.currency} />
+          }
+        />
+        <CompactStat
           label="Market value"
           value={
             summary.marketValue != null ? (
@@ -104,7 +144,7 @@ export function HoldingDetailPanel({
             )
           }
         />
-        <SummaryStat
+        <CompactStat
           label="Total gains"
           value={
             summary.totalGains != null ? (
@@ -117,19 +157,7 @@ export function HoldingDetailPanel({
             )
           }
         />
-        <SummaryStat
-          label="Total cost"
-          value={
-            <Money amount={summary.totalCost} currency={holding.currency} />
-          }
-        />
-        <SummaryStat
-          label="Avg purchase"
-          value={
-            <Money amount={summary.avgCost} currency={holding.currency} />
-          }
-        />
-        <SummaryStat
+        <CompactStat
           label="Transactions"
           value={String(summary.transactionCount)}
         />
@@ -137,21 +165,20 @@ export function HoldingDetailPanel({
 
       {trades.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No trades recorded yet. Set a first purchase date above, or record a
-          buy for future purchases.
+          No trades yet. Record a buy to build history.
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-muted-foreground">
-                <th className="pb-2 pr-4">Date</th>
-                <th className="pb-2 pr-4">Side</th>
-                <th className="pb-2 pr-4 text-right">Unit price</th>
-                <th className="pb-2 pr-4 text-right">Qty</th>
-                <th className="pb-2 pr-4 text-right">Total</th>
-                <th className="pb-2 pr-4 text-right">Lot value</th>
-                <th className="pb-2 pr-4 text-right">Gain</th>
+              <tr className="border-b border-border/70 text-left text-xs text-muted-foreground">
+                <th className="pb-2 pr-3 font-medium">Date</th>
+                <th className="pb-2 pr-3 font-medium">Side</th>
+                <th className="pb-2 pr-3 text-right font-medium">Unit price</th>
+                <th className="pb-2 pr-3 text-right font-medium">Qty</th>
+                <th className="pb-2 pr-3 text-right font-medium">Total</th>
+                <th className="pb-2 pr-3 text-right font-medium">Lot value</th>
+                <th className="pb-2 pr-3 text-right font-medium">Gain</th>
                 <th className="pb-2" />
               </tr>
             </thead>
@@ -159,8 +186,8 @@ export function HoldingDetailPanel({
               {trades.map((trade) => {
                 const metrics = lotMetrics(trade, price);
                 return (
-                  <tr key={trade.id} className="border-b border-border/60">
-                    <td className="py-2.5 pr-4">
+                  <tr key={trade.id} className="border-b border-border/40">
+                    <td className="py-2 pr-3">
                       <form action={updateHoldingTradeDate} className="flex">
                         <input type="hidden" name="id" value={trade.id} />
                         <Input
@@ -168,28 +195,32 @@ export function HoldingDetailPanel({
                           type="date"
                           defaultValue={trade.date}
                           className="h-8 w-[9.5rem] px-2 text-xs"
-                          onChange={(e) => e.currentTarget.form?.requestSubmit()}
+                          onChange={(e) =>
+                            e.currentTarget.form?.requestSubmit()
+                          }
                           aria-label="Trade date"
                         />
                       </form>
                     </td>
-                    <td className="py-2.5 pr-4 capitalize">{trade.side}</td>
-                    <td className="py-2.5 pr-4 text-right tabular-nums">
+                    <td className="py-2 pr-3 capitalize text-muted-foreground">
+                      {trade.side}
+                    </td>
+                    <td className="py-2 pr-3 text-right tabular-nums">
                       <Money
                         amount={trade.unitPrice}
                         currency={trade.currency}
                       />
                     </td>
-                    <td className="py-2.5 pr-4 text-right tabular-nums">
+                    <td className="py-2 pr-3 text-right tabular-nums">
                       {trade.quantity}
                     </td>
-                    <td className="py-2.5 pr-4 text-right tabular-nums">
+                    <td className="py-2 pr-3 text-right tabular-nums">
                       <Money
                         amount={trade.totalAmount}
                         currency={trade.currency}
                       />
                     </td>
-                    <td className="py-2.5 pr-4 text-right tabular-nums">
+                    <td className="py-2 pr-3 text-right tabular-nums">
                       {metrics.lotValue != null ? (
                         <Money
                           amount={metrics.lotValue}
@@ -199,7 +230,7 @@ export function HoldingDetailPanel({
                         "—"
                       )}
                     </td>
-                    <td className="py-2.5 pr-4 text-right tabular-nums">
+                    <td className="py-2 pr-3 text-right tabular-nums">
                       {metrics.lotGains != null ? (
                         <PlValue
                           value={metrics.lotGains}
@@ -209,7 +240,7 @@ export function HoldingDetailPanel({
                         "—"
                       )}
                     </td>
-                    <td className="py-2.5 text-right">
+                    <td className="py-2 text-right">
                       <form action={deleteHoldingTrade}>
                         <input type="hidden" name="id" value={trade.id} />
                         <Button
@@ -238,11 +269,11 @@ export function HoldingDetailPanel({
           onClose={() => setTradeOpen(false)}
         />
       )}
-    </Card>
+    </div>
   );
 }
 
-function SummaryStat({
+function CompactStat({
   label,
   value,
 }: {
@@ -250,9 +281,9 @@ function SummaryStat({
   value: ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-border/60 bg-card px-3 py-2">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-0.5 font-medium tabular-nums">{value}</p>
+    <div className="min-w-[7.5rem] flex-1 px-3 py-2.5">
+      <p className="text-[11px] text-muted-foreground">{label}</p>
+      <p className="mt-0.5 text-sm font-medium tabular-nums">{value}</p>
     </div>
   );
 }
