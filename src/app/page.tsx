@@ -27,7 +27,8 @@ import {
   PageHeader,
   StatCard,
 } from "@/components/ui";
-import { NetWorthChart, BreakdownDonut } from "@/components/charts";
+import { BreakdownDonut, NetWorthChart } from "@/components/charts";
+import { BREAKDOWN_COLORS, NET_WORTH_COLOR } from "@/lib/chart-colors";
 import { CategoryIcon } from "@/components/category-icon";
 import { DashboardGoals } from "@/components/dashboard-goals";
 import { DashboardMonthlyBudget } from "@/components/dashboard-monthly-budget";
@@ -175,7 +176,7 @@ export default async function DashboardPage() {
           value={formatMoney(summary.netWorthBase, summary.baseCurrency)}
           trend={netWorthTrend}
           sparklineData={sparklines.netWorth}
-          accentColor="oklch(0.7 0.16 250)"
+          accentColor={NET_WORTH_COLOR}
         />
         <StatCard
           label="Investments"
@@ -186,7 +187,7 @@ export default async function DashboardPage() {
           href="/portfolio"
           trend={investmentsTrend}
           sparklineData={sparklines.investments}
-          accentColor="oklch(0.72 0.14 300)"
+          accentColor={BREAKDOWN_COLORS.Investments}
         />
         <StatCard
           label="Cash balance"
@@ -194,7 +195,7 @@ export default async function DashboardPage() {
           href="/accounts"
           trend={cashTrend}
           sparklineData={sparklines.cash}
-          accentColor="oklch(0.7 0.14 165)"
+          accentColor={BREAKDOWN_COLORS.Cash}
         />
         <StatCard
           label="Crypto balance"
@@ -202,7 +203,7 @@ export default async function DashboardPage() {
           href="/crypto"
           trend={cryptoTrend}
           sparklineData={sparklines.crypto}
-          accentColor="oklch(0.74 0.15 75)"
+          accentColor={BREAKDOWN_COLORS.Crypto}
         />
       </div>
 

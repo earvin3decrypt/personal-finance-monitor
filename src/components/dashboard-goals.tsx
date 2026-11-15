@@ -2,8 +2,9 @@ import Link from "next/link";
 import { ChevronRight, Plus } from "lucide-react";
 import { CategoryIcon } from "@/components/category-icon";
 import { Card } from "@/components/ui";
-import { formatMoney } from "@/lib/format";
 import { Money } from "@/components/money";
+import { NET_WORTH_COLOR } from "@/lib/chart-colors";
+import { formatMoney } from "@/lib/format";
 
 type Goal = {
   id: number;
@@ -65,14 +66,20 @@ export function DashboardGoals({ goals }: { goals: Goal[] }) {
                       {goal.name}
                     </span>
                   </span>
-                  <span className="shrink-0 text-sm font-semibold tabular-nums text-primary">
+                  <span
+                    className="shrink-0 text-sm font-semibold tabular-nums"
+                    style={{ color: NET_WORTH_COLOR }}
+                  >
                     {Math.round(goal.percent)}%
                   </span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-muted">
                   <div
-                    className="h-full rounded-full bg-primary transition-all"
-                    style={{ width: `${Math.min(100, goal.percent)}%` }}
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${Math.min(100, goal.percent)}%`,
+                      backgroundColor: NET_WORTH_COLOR,
+                    }}
                   />
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">

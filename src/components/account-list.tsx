@@ -16,7 +16,7 @@ export const TYPE_LABELS: Record<string, string> = {
 };
 
 export const TYPE_DOT_COLOR: Record<string, string> = {
-  checking: "bg-[#3B82F6]",
+  checking: "bg-primary",
   savings: "bg-emerald-500",
   cash: "bg-amber-500",
 };

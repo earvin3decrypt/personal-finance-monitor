@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-import { CategoryIcon } from "@/components/category-icon";
+import { CategoryIcon, safeHexColor } from "@/components/category-icon";
 import { Card } from "@/components/ui";
 import { Money } from "@/components/money";
+import { NET_WORTH_COLOR, pastelHex } from "@/lib/chart-colors";
 import { formatMoney } from "@/lib/format";
 
 export type DashboardBudgetItem = {
@@ -79,9 +80,14 @@ export function DashboardMonthlyBudget({
           <div className="mb-4 h-2 overflow-hidden rounded-full bg-muted">
             <div
               className={`h-full rounded-full transition-all ${
-                overallPercent > 100 ? "bg-loss" : "bg-primary"
+                overallPercent > 100 ? "bg-loss" : ""
               }`}
-              style={{ width: `${Math.min(100, overallPercent)}%` }}
+              style={{
+                width: `${Math.min(100, overallPercent)}%`,
+                ...(overallPercent > 100
+                  ? {}
+                  : { backgroundColor: NET_WORTH_COLOR }),
+              }}
             />
           </div>
 
@@ -102,9 +108,18 @@ export function DashboardMonthlyBudget({
                     <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                       <div
                         className={`h-full rounded-full ${
-                          b.percent > 100 ? "bg-loss" : "bg-primary/80"
+                          b.percent > 100 ? "bg-loss" : ""
                         }`}
-                        style={{ width: `${Math.min(100, b.percent)}%` }}
+                        style={{
+                          width: `${Math.min(100, b.percent)}%`,
+                          ...(b.percent > 100
+                            ? {}
+                            : {
+                                backgroundColor: pastelHex(
+                                  safeHexColor(b.color),
+                                ),
+                              }),
+                        }}
                       />
                     </div>
                   </div>

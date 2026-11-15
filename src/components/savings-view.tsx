@@ -23,10 +23,10 @@ import type { SavingsGoalRow, SavingsOverview } from "@/lib/savings";
 import { Money } from "@/components/money";
 
 const GOAL_ACCENTS = [
-  "oklch(0.62 0.16 250)",
-  "oklch(0.72 0.15 55)",
-  "oklch(0.65 0.16 300)",
-  "oklch(0.62 0.12 180)",
+  "oklch(0.68 0.1 250)",
+  "oklch(0.74 0.1 55)",
+  "oklch(0.7 0.1 300)",
+  "oklch(0.68 0.09 180)",
 ] as const;
 
 const QUICK_AMOUNTS = [25, 50, 100, 250];

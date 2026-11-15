@@ -8,6 +8,53 @@ import { Button, Input, Label, Modal, Select } from "@/components/ui";
 import type { TransferHistoryRow } from "@/lib/transfers";
 import { formatMoney, todayISO } from "@/lib/format";
 
+function SentAmountField({
+  value,
+  onChange,
+  availableBalance,
+  currency,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  availableBalance: number;
+  currency: string | null;
+}) {
+  const showMax = availableBalance > 0 && currency != null;
+
+  return (
+    <>
+      <div className="relative">
+        <Input
+          id="transfer-sent"
+          name="sentAmount"
+          type="number"
+          step="0.01"
+          min="0.01"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="0.00"
+          required
+          className={showMax ? "pr-14" : undefined}
+        />
+        {showMax && (
+          <button
+            type="button"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md bg-primary-light px-2 py-1 text-xs font-medium text-primary hover:bg-primary/15"
+            onClick={() => onChange(availableBalance.toFixed(2))}
+          >
+            Max
+          </button>
+        )}
+      </div>
+      {showMax && (
+        <p className="mt-1 text-[11px] tabular-nums text-muted-foreground">
+          Available: {formatMoney(availableBalance, currency)}
+        </p>
+      )}
+    </>
+  );
+}
+
 export function AccountTransferModal({
   accounts,
   transfer,
@@ -42,6 +89,13 @@ export function AccountTransferModal({
     !!fromAccount &&
     !!toAccount &&
     fromAccount.currency === toAccount.currency;
+
+  const availableBalance = fromAccount
+    ? fromAccount.balance +
+      (isEditing && transfer && transfer.fromAccountId === fromAccount.id
+        ? transfer.sentAmount
+        : 0)
+    : 0;
 
   useEffect(() => {
     if (!open) return;
@@ -194,16 +248,11 @@ export function AccountTransferModal({
                 Amount
                 {fromAccount ? ` (${fromAccount.currency})` : ""}
               </Label>
-              <Input
-                id="transfer-sent"
-                name="sentAmount"
-                type="number"
-                step="0.01"
-                min="0.01"
+              <SentAmountField
                 value={sentAmount}
-                onChange={(e) => setSentAmount(e.target.value)}
-                placeholder="0.00"
-                required
+                onChange={setSentAmount}
+                availableBalance={availableBalance}
+                currency={fromAccount?.currency ?? null}
               />
             </div>
           ) : (
@@ -213,16 +262,11 @@ export function AccountTransferModal({
                   Sent amount
                   {fromAccount ? ` (${fromAccount.currency})` : ""}
                 </Label>
-                <Input
-                  id="transfer-sent"
-                  name="sentAmount"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
+                <SentAmountField
                   value={sentAmount}
-                  onChange={(e) => setSentAmount(e.target.value)}
-                  placeholder="0.00"
-                  required
+                  onChange={setSentAmount}
+                  availableBalance={availableBalance}
+                  currency={fromAccount?.currency ?? null}
                 />
               </div>
               <div>

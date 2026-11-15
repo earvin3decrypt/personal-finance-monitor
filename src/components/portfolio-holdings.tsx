@@ -20,12 +20,12 @@ import { cn } from "@/lib/utils";
 type AccountOption = { id: number; name: string; currency: string };
 
 const ALLOCATION_COLORS = [
-  "oklch(0.72 0.16 55)",
-  "oklch(0.58 0.12 250)",
-  "oklch(0.72 0.08 230)",
-  "oklch(0.65 0.14 145)",
-  "oklch(0.68 0.12 30)",
-  "oklch(0.62 0.1 290)",
+  "oklch(0.74 0.1 55)",
+  "oklch(0.68 0.1 250)",
+  "oklch(0.74 0.07 230)",
+  "oklch(0.7 0.1 145)",
+  "oklch(0.72 0.09 30)",
+  "oklch(0.68 0.08 290)",
 ];
 
 function allocationColor(index: number): string {

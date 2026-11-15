@@ -39,6 +39,7 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
+import { pastelHex } from "@/lib/chart-colors";
 import { cn } from "@/lib/utils";
 
 export const ICONS: Record<string, LucideIcon> = {
@@ -134,7 +135,9 @@ export function CategoryIcon({
   plain?: boolean;
 }) {
   const Icon = ICONS[icon] ?? Tag;
-  const paint = color ? safeHexColor(color, "var(--primary)") : "var(--primary)";
+  const soft =
+    color && isHexColor(color) ? pastelHex(safeHexColor(color)) : null;
+  const paint = soft ?? "var(--primary)";
   if (plain) {
     return (
       <Icon
@@ -153,7 +156,7 @@ export function CategoryIcon({
       style={{
         width: size + 16,
         height: size + 16,
-        backgroundColor: color && isHexColor(color) ? `${color}22` : "var(--muted)",
+        backgroundColor: soft ? `${soft}33` : "var(--muted)",
         color: paint,
       }}
     >

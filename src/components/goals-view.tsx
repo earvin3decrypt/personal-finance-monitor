@@ -4,6 +4,7 @@ import { useEffect, useId, useState, useTransition } from "react";
 import { ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
 import { CategoryIcon, safeHexColor } from "@/components/category-icon";
 import { Button } from "@/components/ui";
+import { pastelHex } from "@/lib/chart-colors";
 import { formatMoney } from "@/lib/format";
 import {
   saveBudget,
@@ -317,7 +318,9 @@ function BudgetCard({
             className="h-full rounded-full transition-all"
             style={{
               width: `${progressWidth}%`,
-              backgroundColor: overBudget ? "var(--loss)" : safeHexColor(budget.color),
+              backgroundColor: overBudget
+                ? "var(--loss)"
+                : pastelHex(safeHexColor(budget.color)),
             }}
           />
         </div>

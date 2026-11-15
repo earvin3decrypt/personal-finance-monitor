@@ -5,6 +5,7 @@ import { safeHexColor } from "@/components/category-icon";
 import { useExpenseFilters } from "@/components/expense-filter-context";
 import { Card } from "@/components/ui";
 import { Money } from "@/components/money";
+import { pastelHex } from "@/lib/chart-colors";
 import { formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { CategoryBreakdown } from "@/lib/expense-stats";
@@ -14,8 +15,6 @@ const CHART_CENTER = CHART_SIZE / 2;
 const MAX_RADIUS = 92;
 const MIN_RADIUS = 28;
 const INNER_HOLE = 18;
-/** Mix category hue toward white for softer chart fills (keep hues recognizable). */
-const PASTEL_WHITE_MIX = 0.28;
 
 function FixedBadge() {
   return (
@@ -28,20 +27,6 @@ function FixedBadge() {
 function formatPercent(percent: number): string {
   if (percent > 0 && percent < 1) return "<1%";
   return `${percent.toFixed(0)}%`;
-}
-
-/** Soften a category hex by mixing toward white; hue stays recognizable. */
-function pastelCategoryColor(hex: string, whiteMix = PASTEL_WHITE_MIX): string {
-  const raw = hex.replace("#", "");
-  if (raw.length !== 6) return hex;
-  const r = parseInt(raw.slice(0, 2), 16);
-  const g = parseInt(raw.slice(2, 4), 16);
-  const b = parseInt(raw.slice(4, 6), 16);
-  if ([r, g, b].some((n) => Number.isNaN(n))) return hex;
-  const mix = (c: number) => Math.round(c + (255 - c) * whiteMix);
-  return `#${[mix(r), mix(g), mix(b)]
-    .map((n) => n.toString(16).padStart(2, "0"))
-    .join("")}`;
 }
 
 function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
@@ -226,7 +211,7 @@ export function ExpenseCategoryBreakdown({
         MIN_RADIUS + Math.sqrt(Math.max(0, ratio)) * (MAX_RADIUS - MIN_RADIUS);
       return {
         ...cat,
-        color: pastelCategoryColor(safeHexColor(cat.color)),
+        color: pastelHex(safeHexColor(cat.color)),
         startAngle: index * angle,
         endAngle: (index + 1) * angle,
         radius,
@@ -312,7 +297,7 @@ export function ExpenseCategoryBreakdown({
                         style={{
                           backgroundColor:
                             pastelById.get(cat.categoryId) ??
-                            pastelCategoryColor(safeHexColor(cat.color)),
+                            pastelHex(safeHexColor(cat.color)),
                         }}
                         aria-hidden
                       />
@@ -382,7 +367,7 @@ export function ExpenseCategoryBreakdown({
                       : sharePct;
                     const fillColor =
                       pastelById.get(active.categoryId) ??
-                      pastelCategoryColor(safeHexColor(active.color));
+                      pastelHex(safeHexColor(active.color));
 
                     return (
                       <li key={sub.id} className="min-w-0">

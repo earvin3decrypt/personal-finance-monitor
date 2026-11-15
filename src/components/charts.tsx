@@ -29,6 +29,9 @@ import {
   yAxisDomain,
 } from "@/lib/chart-data";
 import { Money } from "@/components/money";
+import { BREAKDOWN_COLORS, NET_WORTH_COLOR } from "@/lib/chart-colors";
+
+export { BREAKDOWN_COLORS, NET_WORTH_COLOR };
 
 const DISPLAY_RANGES: ChartRange[] = ["1M", "3M", "6M", "1Y"];
 
@@ -263,12 +266,6 @@ function EvolutionAreaChart({
   );
 }
 
-const BREAKDOWN_COLORS: Record<string, string> = {
-  Cash: "oklch(0.58 0.14 165)",
-  Investments: "oklch(0.72 0.12 300)",
-  Crypto: "oklch(0.72 0.16 75)",
-};
-
 type ChartProps = {
   data: { date: string; total: number }[];
   currency: string;
@@ -370,7 +367,7 @@ export function NetWorthChart({
 
   const labels = { total: "Net worth", cash: "Cash", investments: "Investments", crypto: "Crypto" };
   const colors = {
-    total: theme.primary,
+    total: NET_WORTH_COLOR,
     cash: BREAKDOWN_COLORS.Cash,
     investments: BREAKDOWN_COLORS.Investments,
     crypto: BREAKDOWN_COLORS.Crypto,
@@ -542,7 +539,7 @@ export function InvestmentsChart({ data, currency }: ChartProps) {
       data={data}
       currency={currency}
       gradientId="colorInvestments"
-      strokeColor="oklch(0.6 0.15 145)"
+      strokeColor={BREAKDOWN_COLORS.Investments}
       tooltipLabel="Investments"
     />
   );
@@ -566,7 +563,7 @@ export function CryptoChart({ data, currency }: ChartProps) {
       data={data}
       currency={currency}
       gradientId="colorCrypto"
-      strokeColor="oklch(0.72 0.16 75)"
+      strokeColor={BREAKDOWN_COLORS.Crypto}
       tooltipLabel="Crypto"
     />
   );
